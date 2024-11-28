@@ -314,22 +314,28 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			Name:     "user_login",
 			Value:    username,
 			Path:     "/",
-			MaxAge:   86400, // 1 day
-			SameSite: http.SameSiteNoneMode,
-			Secure:   false,
+			Domain:   "schools.infinitytechafrica.com",        // Replace with your actual domain
+			MaxAge:   86400,                  // 1 day
+			SameSite: http.SameSiteStrictMode, // Choose StrictMode, LaxMode, or NoneMode as needed
+			Secure:   true,                    // Ensure cookies are sent only over HTTPS
+			HttpOnly: true,                    // Prevent JavaScript access to cookies
 		})
-
+		
 		// If 'remember me' is checked, store the password as well
 		if remember {
 			cookiePassword := &http.Cookie{
 				Name:     "userpassword",
 				Value:    password,
 				Path:     "/",
-				MaxAge:   86400, // 1 day
-				SameSite: http.SameSiteNoneMode, // Allow cross-site cookies
+				Domain:   "schools.infinitytechafrica.com",        // Replace with your actual domain
+				MaxAge:   86400,                  // 1 day
+				SameSite: http.SameSiteStrictMode, // Enforce secure cookie handling
+				Secure:   true,                    // Ensure cookies are sent only over HTTPS
+				HttpOnly: true,                    // Prevent JavaScript access to cookies
 			}
 			http.SetCookie(w, cookiePassword)
 		}
+		
 
 
 		// Redirect to the appropriate dashboard or parent page
