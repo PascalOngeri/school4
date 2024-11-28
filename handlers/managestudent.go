@@ -23,18 +23,18 @@ type SelectStudent struct {
 // Function ya kusimamia wanafunzi
 func ManageStudent(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, "store")
-		if err != nil {
-			log.Printf("Failed to retrieve session: %v", err)
-			http.Error(w, "Internal server error.", http.StatusInternalServerError)
-			return
-		}
+		// session, err := store.Get(r, "store")
+		// if err != nil {
+		// 	log.Printf("Failed to retrieve session: %v", err)
+		// 	http.Error(w, "Internal server error.", http.StatusInternalServerError)
+		// 	return
+		// }
 
-		// Check if user is logged in
-		if session.Values["sturecmsaid"] == nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
+		// // Check if user is logged in
+		// if session.Values["sturecmsaid"] == nil {
+		// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+		// 	return
+		// }
 		var sele []SelectStudent
 
 		rows, err := db.Query("SELECT id, adm, class, fname, mname, lname, fee, email, phone FROM registration")
