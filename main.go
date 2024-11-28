@@ -310,29 +310,27 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		// if remember {
 		// 	http.SetCookie(w, &http.Cookie{Name: "userpassword", Value: password, Path: "/", MaxAge: 86400})
 		// }
-		isHTTPS := r.TLS != nil
-
-		// Set cookies with the secure flag if HTTPS
-		http.SetCookie(w, &http.Cookie{
+		cookie := &http.Cookie{
 			Name:     "user_login",
 			Value:    username,
 			Path:     "/",
 			MaxAge:   86400, // 1 day
-			SameSite: http.SameSiteLaxMode,
-			Secure:   isHTTPS, // Set Secure flag if HTTPS
-		})
+			SameSite: http.SameSiteNoneMode, // Allow cross-site cookies
+		}
+		http.SetCookie(w, cookie)
 
 		// If 'remember me' is checked, store the password as well
 		if remember {
-			http.SetCookie(w, &http.Cookie{
+			cookiePassword := &http.Cookie{
 				Name:     "userpassword",
 				Value:    password,
 				Path:     "/",
 				MaxAge:   86400, // 1 day
-				SameSite: http.SameSiteLaxMode,
-				Secure:   isHTTPS, // Set Secure flag if HTTPS
-			})
+				SameSite: http.SameSiteNoneMode, // Allow cross-site cookies
+			}
+			http.SetCookie(w, cookiePassword)
 		}
+
 
 		// Redirect to the appropriate dashboard or parent page
 		if foundInAdmin {
