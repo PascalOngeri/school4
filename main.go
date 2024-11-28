@@ -297,12 +297,12 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Save the session
-		session.Save(r, w)
-		// if err := session.Save(r, w); err != nil {
-		// 	log.Printf("Error saving session: %v", err)
-		// 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		// 	return
-		// }		
+		//session.Save(r, w)
+		 if err := session.Save(r, w); err != nil {
+		 	log.Printf("Error saving session: %v", err)
+		 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		 	return
+		 }		
 
 
 		// Set cookies
@@ -310,15 +310,14 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		// if remember {
 		// 	http.SetCookie(w, &http.Cookie{Name: "userpassword", Value: password, Path: "/", MaxAge: 86400})
 		// }
-		cookie := &http.Cookie{
+		http.SetCookie(w, &http.Cookie{
 			Name:     "user_login",
 			Value:    username,
 			Path:     "/",
 			MaxAge:   86400, // 1 day
-			SameSite: http.SameSiteNoneMode, // Allow cross-site cookies
-		}
-		http.SetCookie(w, cookie)
-
+			SameSite: http.SameSiteNoneMode,
+		})
+		
 		// If 'remember me' is checked, store the password as well
 		if remember {
 			cookiePassword := &http.Cookie{
