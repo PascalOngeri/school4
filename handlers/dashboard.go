@@ -8,12 +8,12 @@ import (
 
 // Dashboard handles the /dashboard route
 func Dashboard(w http.ResponseWriter, r *http.Request) {
-	// Retrieve the session
-	session, _ := store.Get(r, "store")
-	if session.Values["sturecmsaid"] == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+	// // Retrieve the session
+	// session, _ := store.Get(r, "store")
+	// if session.Values["sturecmsaid"] == nil {
+	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// 	return
+	// }
 
 	// Parse templates
 	tmpl, err := template.ParseFiles(
