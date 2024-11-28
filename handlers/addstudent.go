@@ -59,11 +59,12 @@ func GetClassDetails(db *sql.DB, class string) (float64, float64, float64, float
 	return t1, t2, t3, fee, nil
 }
 func Addstudent(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	session, _ := store.Get(r, "store")
-	if session.Values["sturecmsaid"] == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+	// session, _ := store.Get(r, "store")
+	// if session.Values["sturecmsaid"] == nil {
+	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// 	return
+	// }
+
 	tmpl, err := template.ParseFiles(
 		"templates/addstudent.html",
 		"includes/header.html",

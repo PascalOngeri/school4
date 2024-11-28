@@ -18,18 +18,20 @@ type Notice struct {
 // ManagePubNot handles public notices by fetching them from the database
 func ManagePubNot(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, "store")
-		if err != nil {
-			log.Printf("Failed to retrieve session: %v", err)
-			http.Error(w, "Internal server error.", http.StatusInternalServerError)
-			return
-		}
 
-		// Check if user is logged in
-		if session.Values["sturecmsaid"] == nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
+		// session, err := store.Get(r, "store")
+		// if err != nil {
+		// 	log.Printf("Failed to retrieve session: %v", err)
+		// 	http.Error(w, "Internal server error.", http.StatusInternalServerError)
+		// 	return
+		// }
+
+		// // Check if user is logged in
+		// if session.Values["sturecmsaid"] == nil {
+		// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+		// 	return
+		// }
+
 		// Query to fetch public notices
 		query := "SELECT ID, NoticeTitle, NoticeMessage FROM tblpublicnotice"
 		rows, err := db.Query(query)

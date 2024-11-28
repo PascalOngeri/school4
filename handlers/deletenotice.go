@@ -10,6 +10,7 @@ import (
 func DeleteNotice(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the notice ID from the URL query string
+
 		session, err := store.Get(r, "store")
 		if err != nil {
 			log.Printf("Failed to retrieve session: %v", err)
@@ -22,6 +23,7 @@ func DeleteNotice(db *sql.DB) http.HandlerFunc {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
+		
 		delID := r.URL.Query().Get("delID")
 		if delID == "" {
 			http.Error(w, "Missing ID parameter", http.StatusBadRequest)

@@ -13,18 +13,20 @@ import (
 // SetFeeHandler handles the Set Fee page
 func SetFeeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Parse templates
-	session, err := store.Get(r, "store")
-	if err != nil {
-		log.Printf("Failed to retrieve session: %v", err)
-		http.Error(w, "Internal server error.", http.StatusInternalServerError)
-		return
-	}
 
-	// Check if user is logged in
-	if session.Values["sturecmsaid"] == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+	// session, err := store.Get(r, "store")
+	// if err != nil {
+	// 	log.Printf("Failed to retrieve session: %v", err)
+	// 	http.Error(w, "Internal server error.", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// // Check if user is logged in
+	// if session.Values["sturecmsaid"] == nil {
+	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// 	return
+	// }
+
 	tmpl, err := template.ParseFiles(
 		"templates/regfee.html",
 		"includes/header.html",

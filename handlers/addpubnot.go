@@ -8,11 +8,13 @@ import (
 )
 
 func AddPubNot(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	session, _ := store.Get(r, "store")
-	if session.Values["sturecmsaid"] == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+
+	// session, _ := store.Get(r, "store")
+	// if session.Values["sturecmsaid"] == nil {
+	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// 	return
+	// }
+
 	if r.Method == http.MethodPost {
 		// Parse the form data
 		if err := r.ParseForm(); err != nil {

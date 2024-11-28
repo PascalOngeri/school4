@@ -12,19 +12,20 @@ import (
 
 // PayFeeHandler handles fee payment logic
 func PayFeeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// Retrieve session
-	session, err := store.Get(r, "store")
-	if err != nil {
-		log.Printf("Failed to retrieve session: %v", err)
-		http.Error(w, "Internal server error.", http.StatusInternalServerError)
-		return
-	}
+	// // Retrieve session
 
-	// Check user authentication
-	if session.Values["sturecmsaid"] == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+	// session, err := store.Get(r, "store")
+	// if err != nil {
+	// 	log.Printf("Failed to retrieve session: %v", err)
+	// 	http.Error(w, "Internal server error.", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// // Check user authentication
+	// if session.Values["sturecmsaid"] == nil {
+	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// 	return
+	// }
 
 	if r.Method == http.MethodPost {
 		adm := r.FormValue("adm")

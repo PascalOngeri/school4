@@ -21,6 +21,7 @@ type HomePageData struct {
 
 // HomeHandler handles requests to the home page
 func HomeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	
 	session, err := store.Get(r, "store")
 	if err != nil {
 		log.Printf("Failed to retrieve session: %v", err)

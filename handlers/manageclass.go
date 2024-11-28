@@ -9,18 +9,20 @@ import (
 
 func Manageclass(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Fetch data from the database
-	session, err := store.Get(r, "store")
-	if err != nil {
-		log.Printf("Failed to retrieve session: %v", err)
-		http.Error(w, "Internal server error.", http.StatusInternalServerError)
-		return
-	}
+	
+	// session, err := store.Get(r, "store")
+	// if err != nil {
+	// 	log.Printf("Failed to retrieve session: %v", err)
+	// 	http.Error(w, "Internal server error.", http.StatusInternalServerError)
+	// 	return
+	// }
 
-	// Check if user is logged in
-	if session.Values["sturecmsaid"] == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+	// // Check if user is logged in
+	// if session.Values["sturecmsaid"] == nil {
+	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// 	return
+	// }
+	
 	users := []User{}
 	rows, err := db.Query("SELECT id, class, t1, t2, t3, fee FROM classes")
 	if err != nil {

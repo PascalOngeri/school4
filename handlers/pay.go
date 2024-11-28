@@ -11,18 +11,20 @@ import (
 
 // HandlePayment processes the payment and updates the database
 func HandlePayment(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	session, err := store.Get(r, "store")
-	if err != nil {
-		log.Printf("Failed to retrieve session: %v", err)
-		http.Error(w, "Internal server error.", http.StatusInternalServerError)
-		return
-	}
 
-	// Check if user is logged in
-	if session.Values["adm"] == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+	// session, err := store.Get(r, "store")
+	// if err != nil {
+	// 	log.Printf("Failed to retrieve session: %v", err)
+	// 	http.Error(w, "Internal server error.", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// // Check if user is logged in
+	// if session.Values["adm"] == nil {
+	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// 	return
+	// }
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return

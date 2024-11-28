@@ -33,18 +33,20 @@ func add1(i int) int {
 	return i + 1
 }
 func searchStudentHandler(w http.ResponseWriter, r *http.Request) {
-	session, err := store.Get(r, "store")
-	if err != nil {
-		log.Printf("Failed to retrieve session: %v", err)
-		http.Error(w, "Internal server error.", http.StatusInternalServerError)
-		return
-	}
 
-	// Check if user is logged in
-	if session.Values["sturecmsaid"] == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+	// session, err := store.Get(r, "store")
+	// if err != nil {
+	// 	log.Printf("Failed to retrieve session: %v", err)
+	// 	http.Error(w, "Internal server error.", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// // Check if user is logged in
+	// if session.Values["sturecmsaid"] == nil {
+	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// 	return
+	// }
+
 	funcMap := template.FuncMap{
 		"add1": add1, // Register the add1 function
 	}

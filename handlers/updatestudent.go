@@ -50,18 +50,19 @@ func getUserByEmail(db *sql.DB, id string) (User, error) {
 // Handler to update user details
 func UpdateUserFormHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Handle GET request to display the form
-	session, err := store.Get(r, "store")
-	if err != nil {
-		log.Printf("Failed to retrieve session: %v", err)
-		http.Error(w, "Internal server error.", http.StatusInternalServerError)
-		return
-	}
 
-	// Check if user is logged in
-	if session.Values["sturecmsaid"] == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+	// session, err := store.Get(r, "store")
+	// if err != nil {
+	// 	log.Printf("Failed to retrieve session: %v", err)
+	// 	http.Error(w, "Internal server error.", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// // Check if user is logged in
+	// if session.Values["sturecmsaid"] == nil {
+	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// 	return
+	// }
 
 	if r.Method == "GET" {
 		id := r.URL.Query().Get("id")

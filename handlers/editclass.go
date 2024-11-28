@@ -12,6 +12,7 @@ import (
 // EditClass handler for editing class details
 func EditClass(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
 		session, err := store.Get(r, "store")
 		if err != nil {
 			log.Printf("Failed to retrieve session: %v", err)

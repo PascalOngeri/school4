@@ -11,6 +11,7 @@ import (
 func DeleteClass(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the session
+		
 		session, err := store.Get(r, "store")
 		if err != nil {
 			log.Printf("Failed to retrieve session: %v", err)
