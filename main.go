@@ -316,8 +316,9 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			Path:     "/",
 			MaxAge:   86400, // 1 day
 			SameSite: http.SameSiteNoneMode,
+			Secure:   false,
 		})
-		
+
 		// If 'remember me' is checked, store the password as well
 		if remember {
 			cookiePassword := &http.Cookie{
