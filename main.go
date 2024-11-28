@@ -298,11 +298,40 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 
 		// Save the session
 		session.Save(r, w)
+		// if err := session.Save(r, w); err != nil {
+		// 	log.Printf("Error saving session: %v", err)
+		// 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		// 	return
+		// }		
+
 
 		// Set cookies
-		http.SetCookie(w, &http.Cookie{Name: "user_login", Value: username, Path: "/", MaxAge: 86400})
+		// http.SetCookie(w, &http.Cookie{Name: "user_login", Value: username, Path: "/", MaxAge: 86400})
+		// if remember {
+		// 	http.SetCookie(w, &http.Cookie{Name: "userpassword", Value: password, Path: "/", MaxAge: 86400})
+		// }
+		isHTTPS := r.TLS != nil
+
+		// Set cookies with the secure flag if HTTPS
+		http.SetCookie(w, &http.Cookie{
+			Name:     "user_login",
+			Value:    username,
+			Path:     "/",
+			MaxAge:   86400, // 1 day
+			SameSite: http.SameSiteLaxMode,
+			Secure:   isHTTPS, // Set Secure flag if HTTPS
+		})
+
+		// If 'remember me' is checked, store the password as well
 		if remember {
-			http.SetCookie(w, &http.Cookie{Name: "userpassword", Value: password, Path: "/", MaxAge: 86400})
+			http.SetCookie(w, &http.Cookie{
+				Name:     "userpassword",
+				Value:    password,
+				Path:     "/",
+				MaxAge:   86400, // 1 day
+				SameSite: http.SameSiteLaxMode,
+				Secure:   isHTTPS, // Set Secure flag if HTTPS
+			})
 		}
 
 		// Redirect to the appropriate dashboard or parent page
@@ -490,9 +519,15 @@ func main() {
 	router.HandleFunc("/deletecompulsory", func(w http.ResponseWriter, r *http.Request) {
 		handlers.DeleteCompulsoryHandler(w, r, db)
 	}).Methods("GET")
+	// log.Fatal(http.ListenAndServe("127.0.0.1:8080", router))
+	// log.Println("Server is running on :8080")
 
-	log.Println("Server is running on :8080")
-	log.Fatal(http.ListenAndServe("127.0.0.1:8080", router))
+	err = http.ListenAndServe(":8080", router)
+if err != nil {
+    log.Fatalf("Server failed to start: %v", err)
+} 
+
+
 }
 func add1(i int) int {
 	return i + 1

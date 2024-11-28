@@ -4,7 +4,7 @@ go 1.23.2
 
 require (
 	github.com/go-sql-driver/mysql v1.8.1
-	github.com/gorilla/sessions v1.4.0
+	github.com/gorilla/sessions v1.3.0
 	golang.org/x/crypto v0.22.0
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/gorm v1.25.12
