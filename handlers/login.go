@@ -5,12 +5,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-
-	"github.com/gorilla/sessions"
 )
-
-// Global session store
-var store = sessions.NewCookieStore([]byte("your-secret-key"))
 
 type API struct {
 	Name  string
@@ -53,7 +48,11 @@ func renderLoginPage(w http.ResponseWriter, api API, username string) {
 		http.Error(w, "Error loading template", http.StatusInternalServerError)
 		return
 	}
-	tmpl.Execute(w, loginData)
+	err = tmpl.Execute(w, loginData)
+	if err != nil {
+		log.Printf("Error executing template: %v", err)
+		http.Error(w, "Error rendering page", http.StatusInternalServerError)
+	}
 }
 
 func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
@@ -67,53 +66,56 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		var foundInAdmin bool
 		var adm, phone string
 
+		// Attempt to find the user in the admin table
 		queryAdmin := "SELECT ID, UserName FROM tbladmin WHERE UserName = ? AND Password = ?"
 		err := db.QueryRow(queryAdmin, username, password).Scan(&userID, &username)
 		if err == nil {
+			log.Printf("User found in admin table: %s", username)
 			foundInAdmin = true
 		} else {
+			// Attempt to find the user in the registration table
 			queryRegistration := "SELECT id, adm, username, phone, password FROM registration WHERE username = ? AND password = ?"
 			err = db.QueryRow(queryRegistration, username, password).Scan(&userID, &adm, &username, &phone, &password)
 			if err != nil {
+				log.Printf("Login failed for username: %s, error: %v", username, err)
 				http.Error(w, "Invalid login credentials", http.StatusUnauthorized)
 				return
 			}
+			log.Printf("User found in registration table: %s", username)
 		}
 
-		session, _ := store.Get(r, "store")
-		if foundInAdmin {
-			session.Values["sturecmsaid"] = userID
-			session.Values["username"] = username // Set username in session
-		} else {
-			session.Values["sturecmsaid"] = userID
-			session.Values["adm"] = adm
-			session.Values["username"] = username // Set username in session
-			session.Values["phone"] = phone
-			session.Values["password"] = password
-		}
+		// Log the successful login attempt
+		log.Printf("Successful login attempt for user: %s", username)
 
-		session.Save(r, w)
-
+		// Set cookies for the user
 		http.SetCookie(w, &http.Cookie{Name: "user_login", Value: username, Path: "/", MaxAge: 86400})
 		if remember {
 			http.SetCookie(w, &http.Cookie{Name: "userpassword", Value: password, Path: "/", MaxAge: 86400})
 		}
 
+		// Redirect based on the user type
 		if foundInAdmin {
+			log.Printf("Redirecting to admin dashboard for user: %s", username)
 			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		} else {
+			log.Printf("Redirecting to parent page for user: %s", username)
 			http.Redirect(w, r, "/parent", http.StatusSeeOther)
 		}
 		return
 	}
 
-	api, _ := getAPIDetails(db)
+	// Fetch API details
+	api, err := getAPIDetails(db)
+	if err != nil {
+		log.Printf("Error fetching API details: %v", err)
+		http.Error(w, "Error fetching API details", http.StatusInternalServerError)
+		return
+	}
 
-	// Pass the username from session if exists, otherwise empty string
-	session, _ := store.Get(r, "store")
-	username, ok := session.Values["username"].(string)
-	if !ok {
-		username = "" // Default to empty string if not found
+	// Get the username from the query parameters or set to empty string if not found
+	username := r.URL.Query().Get("username")
+	if username == "" {
+		log.Println("No username provided, using default empty string")
 	}
 
 	renderLoginPage(w, api, username)

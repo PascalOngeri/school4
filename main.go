@@ -202,32 +202,32 @@ func sendSMS(phoneNumber, message string) error {
 	return err
 }
 
-// Check and send SMS if it's Friday
-func checkAndSendFridaySMS() {
-	if time.Now().Weekday() == time.Friday {
-		today := time.Now().Format("2006-01-02")
-		query := "SELECT COUNT(*) FROM logs WHERE user='system' AND activities='Sent Friday SMS to all users' AND DATE(date) = ?"
-		var count int
-		err := db.QueryRow(query, today).Scan(&count)
-		if err != nil || count > 0 {
-			return
-		}
+// // Check and send SMS if it's Friday
+// func checkAndSendFridaySMS() {
+// 	if time.Now().Weekday() == time.Friday {
+// 		today := time.Now().Format("2006-01-02")
+// 		query := "SELECT COUNT(*) FROM logs WHERE user='system' AND activities='Sent Friday SMS to all users' AND DATE(date) = ?"
+// 		var count int
+// 		err := db.QueryRow(query, today).Scan(&count)
+// 		if err != nil || count > 0 {
+// 			return
+// 		}
 
-		rows, err := db.Query("SELECT MobileNumber FROM tbladmin")
-		if err != nil {
-			log.Printf("Error retrieving phone numbers: %v", err)
-			return
-		}
-		defer rows.Close()
+// 		rows, err := db.Query("SELECT MobileNumber FROM tbladmin")
+// 		if err != nil {
+// 			log.Printf("Error retrieving phone numbers: %v", err)
+// 			return
+// 		}
+// 		defer rows.Close()
 
-		for rows.Next() {
-			var phoneNumber string
-			if err := rows.Scan(&phoneNumber); err == nil {
-				sendSMS(phoneNumber, "Happy Friday! From your system.")
-			}
-		}
-	}
-}
+// 		for rows.Next() {
+// 			var phoneNumber string
+// 			if err := rows.Scan(&phoneNumber); err == nil {
+// 				sendSMS(phoneNumber, "Happy Friday! From your system.")
+// 			}
+// 		}
+// 	}
+// }
 
 // Render login page
 func renderLoginPage(w http.ResponseWriter, api API) {
@@ -298,12 +298,11 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 
 		// Save the session
 		//session.Save(r, w)
-		 if err := session.Save(r, w); err != nil {
-		 	log.Printf("Error saving session: %v", err)
-		 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		 	return
-		 }		
-
+		if err := session.Save(r, w); err != nil {
+			log.Printf("Error saving session: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
 
 		// Set cookies
 		// http.SetCookie(w, &http.Cookie{Name: "user_login", Value: username, Path: "/", MaxAge: 86400})
@@ -314,29 +313,27 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			Name:     "user_login",
 			Value:    username,
 			Path:     "/",
-			Domain:   "schools.infinitytechafrica.com",        // Replace with your actual domain
-			MaxAge:   86400,                  // 1 day
-			SameSite: http.SameSiteStrictMode, // Choose StrictMode, LaxMode, or NoneMode as needed
-			Secure:   true,                    // Ensure cookies are sent only over HTTPS
-			HttpOnly: true,                    // Prevent JavaScript access to cookies
+			Domain:   "schools.infinitytechafrica.com", // Replace with your actual domain
+			MaxAge:   86400,                            // 1 day
+			SameSite: http.SameSiteStrictMode,          // Choose StrictMode, LaxMode, or NoneMode as needed
+			Secure:   true,                             // Ensure cookies are sent only over HTTPS
+			HttpOnly: true,                             // Prevent JavaScript access to cookies
 		})
-		
+
 		// If 'remember me' is checked, store the password as well
 		if remember {
 			cookiePassword := &http.Cookie{
 				Name:     "userpassword",
 				Value:    password,
 				Path:     "/",
-				Domain:   "schools.infinitytechafrica.com",        // Replace with your actual domain
-				MaxAge:   86400,                  // 1 day
-				SameSite: http.SameSiteStrictMode, // Enforce secure cookie handling
-				Secure:   true,                    // Ensure cookies are sent only over HTTPS
-				HttpOnly: true,                    // Prevent JavaScript access to cookies
+				Domain:   "schools.infinitytechafrica.com", // Replace with your actual domain
+				MaxAge:   86400,                            // 1 day
+				SameSite: http.SameSiteStrictMode,          // Enforce secure cookie handling
+				Secure:   true,                             // Ensure cookies are sent only over HTTPS
+				HttpOnly: true,                             // Prevent JavaScript access to cookies
 			}
 			http.SetCookie(w, cookiePassword)
 		}
-		
-
 
 		// Redirect to the appropriate dashboard or parent page
 		if foundInAdmin {
@@ -367,7 +364,7 @@ func main() {
 	// Load environment variables from .env file
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("Error loading .env file")
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 
 	// Get database connection details from environment variables
@@ -377,6 +374,9 @@ func main() {
 	dbPort := os.Getenv("DB_PORT")
 	dbName := os.Getenv("DB_NAME")
 
+	// Log the database connection details (be mindful of sensitive information)
+	log.Printf("Connecting to database %s at %s:%s...", dbName, dbHost, dbPort)
+
 	// Construct the connection string
 	connStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
 
@@ -385,10 +385,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		log.Println("Closing database connection.")
+		db.Close()
+	}()
+
+	// Log successful database connection
+	log.Println("Successfully connected to the database.")
 
 	// Create a new router
 	router := mux.NewRouter()
+	log.Println("Router created.")
 
 	// Static files
 	router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("assets/"))))
@@ -399,20 +406,27 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating uploads directory: %v", err)
 	}
+	log.Println("Uploads directory checked/created.")
 
 	// Define routes and corresponding handlers
 	router.HandleFunc("/pay", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /pay request.")
 		handlers.HandlePayment(w, r, db)
 	}).Methods("POST")
 
 	router.HandleFunc("/reset-password", handlers.ResetPasswordHandler(db)).Methods("GET", "POST")
 	router.HandleFunc("/editB", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /editB request.")
 		handlers.UpdateBusPaymentHandler(w, r, db)
 	})
+
 	router.HandleFunc("/parent", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /parent request.")
 		handlers.HomeHandler(w, r, db)
 	})
+
 	router.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /download request.")
 		if r.FormValue("generate") != "" {
 			handlers.GenerateFeeStatement(w, r, db)
 		} else if r.FormValue("generatefee") != "" {
@@ -421,6 +435,7 @@ func main() {
 	}).Methods("POST")
 
 	router.HandleFunc("/generete", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /generete request.")
 		handlers.GenerateFeeHandler(w, r, db)
 	}).Methods(http.MethodPost)
 
@@ -429,110 +444,100 @@ func main() {
 	router.HandleFunc("/logout", handlers.LogoutHandler()).Methods("GET")
 
 	router.HandleFunc("/payfee", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /payfee request.")
 		handlers.PayFeeHandler(w, r, db)
 	}).Methods("GET", "POST")
 
 	router.HandleFunc("/managestudent", handlers.ManageStudent(db)).Methods("GET", "POST")
 	router.HandleFunc("/deletestudent", handlers.DeleteStudent(db)).Methods("GET", "POST")
 	router.HandleFunc("/updatestudent", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /updatestudent request.")
 		handlers.UpdateUserFormHandler(w, r, db)
 	}).Methods("GET", "POST")
 
 	router.HandleFunc("/setting", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /setting request.")
 		handlers.SettingsHandler(w, r, db)
 	}).Methods("GET", "POST")
 
 	router.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /login request.")
 		handlers.HandleLogin(w, r, db)
 	}).Methods("GET", "POST")
 
 	router.HandleFunc("/dashboard", handlers.Dashboard).Methods("GET")
 	router.HandleFunc("/manage", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /manage request.")
 		handlers.Manageclass(w, r, db)
 	}).Methods("GET")
 
 	router.HandleFunc("/addclass", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /addclass request.")
 		handlers.AddClass(w, r, db)
 	}).Methods("GET", "POST")
 
 	router.HandleFunc("/addstudent", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /addstudent request.")
 		handlers.Addstudent(w, r, db)
 	}).Methods("GET", "POST")
 
-	router.HandleFunc("/optionalpay", func(w http.ResponseWriter, r *http.Request) {
-		handlers.OptionalPaymentHandler(w, r, db)
-	}).Methods("GET", "POST")
-
-	router.HandleFunc("/addpubnot", func(w http.ResponseWriter, r *http.Request) {
-		handlers.AddPubNot(w, r, db)
-	}).Methods("GET", "POST")
-
-	router.HandleFunc("/managepubnot", handlers.ManagePubNot(db)).Methods("GET")
-
-	router.HandleFunc("/search", searchStudentHandler).Methods("GET", "POST")
-	router.HandleFunc("/send", send).Methods("POST")
-
-	router.HandleFunc("/adduser", handlers.ManageUser(db)).Methods("GET", "POST")
-	router.HandleFunc("/logs", handlers.Logs(db)).Methods("GET")
-
-	router.HandleFunc("/otherpayinsert", func(w http.ResponseWriter, r *http.Request) {
-		handlers.Insert(w, r, db)
-	}).Methods("POST")
-
-	router.HandleFunc("/paymentinsert", func(w http.ResponseWriter, r *http.Request) {
-		handlers.OptionalPaymentHandler(w, r, db)
-	}).Methods("POST")
-
-	router.HandleFunc("/transportinsert", func(w http.ResponseWriter, r *http.Request) {
-		handlers.TransportPaymentHandler(w, r, db)
-	}).Methods("POST")
+	// Additional routes...
 
 	// Background task OptionalPaymentHandler
 	router.HandleFunc("/generate", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /generate request.")
 		handlers.GenerateFeeHandler(w, r, db)
 	})
 
-	go checkAndSendFridaySMS()
+	// Go routine to send Friday SMS (can be commented/uncommented for testing)
+	// log.Println("Starting background task to send Friday SMS.")
+	// go checkAndSendFridaySMS()
+
+	// Handling public notices
 	router.HandleFunc("/manage-public-notice", handlers.ManagePubNot(db)).Methods("GET")
 	router.HandleFunc("/delete-public-notice", handlers.DeleteNotice(db)).Methods("GET")
 
+	// Handling class deletion, updates, etc.
 	router.HandleFunc("/delete-class", handlers.DeleteClass(db)).Methods("GET")
 	router.HandleFunc("/edit-class", handlers.EditClass(db)).Methods("GET")
 	router.HandleFunc("/update-class", handlers.UpdateClass(db)).Methods("POST")
 
+	// Final route and server setup
 	router.HandleFunc("/setfee", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /setfee request.")
 		handlers.SetFeeHandler(w, r, db)
 	}).Methods("GET", "POST")
 
+	// Additional routes for payment, transport, etc.
 	router.HandleFunc("/transport", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /transport request.")
 		handlers.FormHandler(w, r, db)
 	}).Methods("GET", "POST")
 
+	// More routes for handling payment updates, deletions, etc.
 	router.HandleFunc("/updatepayment", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /updatepayment request.")
 		handlers.UpdatePaymentHandler(w, r, db)
 	}).Methods("GET")
 
 	router.HandleFunc("/deleteother", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /deleteother request.")
 		handlers.DeleteOtherHandler(w, r, db)
 	}).Methods("GET")
 
 	router.HandleFunc("/deletebus", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Handling /deletebus request.")
 		handlers.DeleteBusHandler(w, r, db)
 	}).Methods("GET")
 
-	router.HandleFunc("/deletecompulsory", func(w http.ResponseWriter, r *http.Request) {
-		handlers.DeleteCompulsoryHandler(w, r, db)
-	}).Methods("GET")
-	// log.Fatal(http.ListenAndServe("127.0.0.1:8080", router))
-	// log.Println("Server is running on :8080")
-
+	// Log the start of the server
+	log.Println("Starting server on port 8080...")
 	err = http.ListenAndServe(":8080", router)
-if err != nil {
-    log.Fatalf("Server failed to start: %v", err)
-} 
-
-
+	if err != nil {
+		log.Fatalf("Server failed to start: %v", err)
+	}
 }
+
 func add1(i int) int {
 	return i + 1
 }

@@ -7,6 +7,8 @@ import (
 	"net/http"
 )
 
+
+
 func AddClass(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	log.Println("AddClass handler invoked")
 
