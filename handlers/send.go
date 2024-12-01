@@ -58,7 +58,7 @@ func Send(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 }
 
 // SendSmsHandler sends an SMS to the provided phone number with the given message
-func SendSmsHandler(phone string, message string) error {
+func SendSms(phone string, message string) error {
 	// Example SMS sending implementation - replace with your SMS service logic
 	log.Printf("Sending SMS to %s: %s", phone, message)
 	// Integrate your SMS API here and return any potential errors

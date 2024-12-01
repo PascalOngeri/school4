@@ -30,7 +30,7 @@ type SmsRequest struct {
 	CallbackURL string `json:"callback_url"`
 }
 
-func SendSms(phone, message string) error {
+func SendSmsHandler(phone, message string) error {
 	// Credentials for API token retrieval
 	username := "+254708107995"                                                    // Replace with your username
 	password := "e05b0e0d42c608dd08151cfc325da68f1eadd7bf60e457a043bc2e1de39635e2" // Replace with your password
