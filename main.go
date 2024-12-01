@@ -125,8 +125,8 @@ var store = sessions.NewCookieStore([]byte("store"))
 // Initialize the database connection
 func initDB() {
 	var err error
-	db, err = sql.Open("mysql", "remote:Qwerty254!@tcp(173.249.20.229:3306)/schoolsystem")
-	//db, err = sql.Open("mysql", "remote:@tcp(localhost:3306)/eduauth")
+	//db, err = sql.Open("mysql", "root:@mesopotamia123@tcp(localhost:3306)/eduauth")
+	db, err = sql.Open("mysql", "root:@tcp(localhost:3306)/eduauth")
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -394,7 +394,7 @@ func main() {
 	log.Println("Successfully connected to the database.")
 
 	// Create a new router
-	
+
 	router := mux.NewRouter()
 	router.HandleFunc("/api/select-phones", handlers.SelectPhonesHandler(db)).Methods("GET", "POST")
 
@@ -535,17 +535,16 @@ func main() {
 	router.HandleFunc("/deletecompulsory", func(w http.ResponseWriter, r *http.Request) {
 		handlers.DeleteCompulsoryHandler(w, r, db)
 	}).Methods("GET")
-	
+
 	router.HandleFunc("/send", func(w http.ResponseWriter, r *http.Request) {
 		handlers.Send(w, r, db)
 	}).Methods("GET", "POST")
 
 	log.Println("Server is running on :8080")
-	if err := http.ListenAndServe("localhost:8080", router); err != nil {
+	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatal("Error starting server: ", err)
 	}
 }
-
 
 func add1(i int) int {
 	return i + 1
