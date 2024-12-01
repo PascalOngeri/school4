@@ -394,39 +394,40 @@ func main() {
 	log.Println("Successfully connected to the database.")
 
 	// Create a new router
+	
 	router := mux.NewRouter()
-	log.Println("Router created.")
+	router.HandleFunc("/api/select-phones", handlers.SelectPhonesHandler(db)).Methods("GET", "POST")
 
+	//router.HandleFunc("/generatefee", GenerateFeeStructureHandler).Methods(http.MethodPost)
+
+	router.HandleFunc("/ProcessPayment", func(w http.ResponseWriter, r *http.Request) {
+		handlers.ProcessPayment(w, r, db)
+	}).Methods("POST")
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		handlers.HandleLogin(w, r, db) // Passing db to the handler
+	}).Methods("GET", "POST")
 	// Static files
+
+	//router.HandleFunc("/ProcessPayment", handlers.ProcessPayment(db)).Methods("GET", "POST")
 	router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("assets/"))))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static/"))))
 
-	// Create uploads folder if it doesn't exist
-	err = os.MkdirAll("uploads", os.ModePerm)
-	if err != nil {
-		log.Fatalf("Error creating uploads directory: %v", err)
+	// Create uploads folder
+	if err := os.MkdirAll("uploads", os.ModePerm); err != nil {
+		panic(fmt.Sprintf("Error creating uploads directory: %v", err))
 	}
-	log.Println("Uploads directory checked/created.")
-
-	// Define routes and corresponding handlers
 	router.HandleFunc("/pay", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /pay request.")
 		handlers.HandlePayment(w, r, db)
 	}).Methods("POST")
 
 	router.HandleFunc("/reset-password", handlers.ResetPasswordHandler(db)).Methods("GET", "POST")
 	router.HandleFunc("/editB", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /editB request.")
 		handlers.UpdateBusPaymentHandler(w, r, db)
 	})
-
 	router.HandleFunc("/parent", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /parent request.")
-		handlers.HomeHandler(w, r, db)
+		handlers.HomeHandler(w, r, db) // Pitisha db ndani ya handler
 	})
-
 	router.HandleFunc("/download", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /download request.")
 		if r.FormValue("generate") != "" {
 			handlers.GenerateFeeStatement(w, r, db)
 		} else if r.FormValue("generatefee") != "" {
@@ -435,108 +436,116 @@ func main() {
 	}).Methods("POST")
 
 	router.HandleFunc("/generete", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /generete request.")
-		handlers.GenerateFeeHandler(w, r, db)
+		handlers.GenerateFeeHandler(w, r, db) // Pass database instance to handler
 	}).Methods(http.MethodPost)
 
+	//router.HandleFunc("/edit-compulsory-payment", handlers.EditCompulsoryPaymentHandler(db)).Methods("GET", "POST")
 	router.HandleFunc("/edit-compulsory-payment", handlers.EditCompulsoryPaymentHandler(db))
 	router.HandleFunc("/edit-other-payment", handlers.EditOtherPaymentHandler(db)).Methods("GET", "POST")
 	router.HandleFunc("/logout", handlers.LogoutHandler()).Methods("GET")
 
+	// Routes
 	router.HandleFunc("/payfee", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /payfee request.")
 		handlers.PayFeeHandler(w, r, db)
 	}).Methods("GET", "POST")
-
 	router.HandleFunc("/managestudent", handlers.ManageStudent(db)).Methods("GET", "POST")
+
+	//router.HandleFunc("/managestudent", handlers.ManageStudent(db)).Methods("GET")
 	router.HandleFunc("/deletestudent", handlers.DeleteStudent(db)).Methods("GET", "POST")
+
 	router.HandleFunc("/updatestudent", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /updatestudent request.")
-		handlers.UpdateUserFormHandler(w, r, db)
+		handlers.UpdateUserFormHandler(w, r, db) // pass db to the handler
 	}).Methods("GET", "POST")
 
 	router.HandleFunc("/setting", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /setting request.")
-		handlers.SettingsHandler(w, r, db)
+		handlers.SettingsHandler(w, r, db) // Pass all required arguments
 	}).Methods("GET", "POST")
 
 	router.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /login request.")
-		handlers.HandleLogin(w, r, db)
+		handlers.HandleLogin(w, r, db) // Passing db to the handler
 	}).Methods("GET", "POST")
 
 	router.HandleFunc("/dashboard", handlers.Dashboard).Methods("GET")
+
 	router.HandleFunc("/manage", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /manage request.")
-		handlers.Manageclass(w, r, db)
+		handlers.Manageclass(w, r, db) // Pass the `db` connection explicitly
 	}).Methods("GET")
-
 	router.HandleFunc("/addclass", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /addclass request.")
-		handlers.AddClass(w, r, db)
+		handlers.AddClass(w, r, db) // Pass the db connection explicitly
 	}).Methods("GET", "POST")
 
+	//router.HandleFunc("/regfee", regfee).Methods("GET", "POST")
+	//router.HandleFunc("/edelete", edelete).Methods("POST")
+	//router.HandleFunc("/optionalpay", optionalpay).Methods("POST")
 	router.HandleFunc("/addstudent", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /addstudent request.")
-		handlers.Addstudent(w, r, db)
+		handlers.Addstudent(w, r, db) // Pitisha `db` kwenye handler
+	}).Methods("GET", "POST")
+	router.HandleFunc("/optionalpay", func(w http.ResponseWriter, r *http.Request) {
+		handlers.OptionalPaymentHandler(w, r, db) // Pitisha `db` kwenye handler
 	}).Methods("GET", "POST")
 
-	// Additional routes...
+	router.HandleFunc("/addpubnot", func(w http.ResponseWriter, r *http.Request) {
+		handlers.AddPubNot(w, r, db)
+	}).Methods("GET", "POST")
+	router.HandleFunc("/managepubnot", handlers.ManagePubNot(db)).Methods("GET")
 
-	// Background task OptionalPaymentHandler
+	//router.HandleFunc("/report", report).Methods("GET")
+
+	router.HandleFunc("/adduser", handlers.ManageUser(db)).Methods("GET", "POST")
+
+	router.HandleFunc("/logs", handlers.Logs(db)).Methods("GET")
+	router.HandleFunc("/otherpayinsert", func(w http.ResponseWriter, r *http.Request) {
+		handlers.Insert(w, r, db)
+	}).Methods("POST")
+	router.HandleFunc("/paymentinsert", func(w http.ResponseWriter, r *http.Request) {
+		handlers.OptionalPaymentHandler(w, r, db)
+	}).Methods("POST")
+	router.HandleFunc("/transportinsert", func(w http.ResponseWriter, r *http.Request) {
+		handlers.TransportPaymentHandler(w, r, db)
+	}).Methods("POST")
+	// Background taskOptionalPaymentHandler
 	router.HandleFunc("/generate", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /generate request.")
 		handlers.GenerateFeeHandler(w, r, db)
 	})
 
-	// Go routine to send Friday SMS (can be commented/uncommented for testing)
-	// log.Println("Starting background task to send Friday SMS.")
-	// go checkAndSendFridaySMS()
-
-	// Handling public notices
 	router.HandleFunc("/manage-public-notice", handlers.ManagePubNot(db)).Methods("GET")
 	router.HandleFunc("/delete-public-notice", handlers.DeleteNotice(db)).Methods("GET")
 
-	// Handling class deletion, updates, etc.
-	router.HandleFunc("/delete-class", handlers.DeleteClass(db)).Methods("GET")
-	router.HandleFunc("/edit-class", handlers.EditClass(db)).Methods("GET")
-	router.HandleFunc("/update-class", handlers.UpdateClass(db)).Methods("POST")
+	router.HandleFunc("/delete-class", handlers.DeleteClass(db)).Methods("GET")  // Delete class
+	router.HandleFunc("/edit-class", handlers.EditClass(db)).Methods("GET")      // Onyesha form ya ku-edit
+	router.HandleFunc("/update-class", handlers.UpdateClass(db)).Methods("POST") // Update class details
 
-	// Final route and server setup
 	router.HandleFunc("/setfee", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /setfee request.")
 		handlers.SetFeeHandler(w, r, db)
 	}).Methods("GET", "POST")
-
-	// Additional routes for payment, transport, etc.
+	// Start server
 	router.HandleFunc("/transport", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /transport request.")
 		handlers.FormHandler(w, r, db)
 	}).Methods("GET", "POST")
 
-	// More routes for handling payment updates, deletions, etc.
 	router.HandleFunc("/updatepayment", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /updatepayment request.")
 		handlers.UpdatePaymentHandler(w, r, db)
 	}).Methods("GET")
-
 	router.HandleFunc("/deleteother", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /deleteother request.")
 		handlers.DeleteOtherHandler(w, r, db)
 	}).Methods("GET")
-
 	router.HandleFunc("/deletebus", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Handling /deletebus request.")
 		handlers.DeleteBusHandler(w, r, db)
 	}).Methods("GET")
+	router.HandleFunc("/deletecompulsory", func(w http.ResponseWriter, r *http.Request) {
+		handlers.DeleteCompulsoryHandler(w, r, db)
+	}).Methods("GET")
+	
+	router.HandleFunc("/send", func(w http.ResponseWriter, r *http.Request) {
+		handlers.Send(w, r, db)
+	}).Methods("GET", "POST")
 
-	// Log the start of the server
-	log.Println("Starting server on port 8080...")
-	err = http.ListenAndServe(":8080", router)
-	if err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+	log.Println("Server is running on :8080")
+	if err := http.ListenAndServe("localhost:8080", router); err != nil {
+		log.Fatal("Error starting server: ", err)
 	}
 }
+
 
 func add1(i int) int {
 	return i + 1
