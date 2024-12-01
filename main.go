@@ -125,8 +125,8 @@ var store = sessions.NewCookieStore([]byte("store"))
 // Initialize the database connection
 func initDB() {
 	var err error
-	//db, err = sql.Open("mysql", "root:@mesopotamia123@tcp(localhost:3306)/eduauth")
-	db, err = sql.Open("mysql", "root:@tcp(localhost:3306)/eduauth")
+	db, err = sql.Open("mysql", "remote:Qwerty254!@tcp(173.249.20.229:3306)/schoolsystem")
+	//db, err = sql.Open("mysql", "remote:@tcp(localhost:3306)/eduauth")
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
