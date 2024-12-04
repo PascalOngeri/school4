@@ -1,26 +1,26 @@
 package handlers
 
 import (
-	"log"
 	"net/http"
+	"time"
 )
 
+// LogoutHandler handles the logout process for JWT-based authentication
 func LogoutHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Log the request to log out
-		log.Println("Logout request received")
+		// Clear the JWT by setting an expired cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     "auth_token",    // The cookie where JWT is stored
+			Value:    "",              // Clear the cookie
+			Expires:  time.Unix(0, 0), // Expire immediately
+			HttpOnly: true,
+			Secure:   true, // Set to true if using HTTPS
+			Path:     "/",
+		})
 
-		// Assuming the logout doesn't use a session, handle it directly
-		// Log the user's attempt to log out
-		username := r.URL.Query().Get("username")
-		if username == "" {
-			log.Println("Logout attempt without username parameter")
-		} else {
-			log.Printf("Logging out user: %s", username)
-		}
+		// Optionally, you can add any other steps needed before logout (like logging out from sessions, etc.)
 
 		// Redirect to the login page
-		log.Println("Redirecting to the login page")
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	}
 }

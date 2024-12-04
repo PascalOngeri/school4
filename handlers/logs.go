@@ -9,7 +9,6 @@ import (
 
 func Logs(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		
 		rows, err := db.Query("SELECT id, date, user, activities FROM logs")
 		if err != nil {
 			http.Error(w, "Database query failed: "+err.Error(), http.StatusInternalServerError)

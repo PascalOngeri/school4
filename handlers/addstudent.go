@@ -59,11 +59,26 @@ func GetClassDetails(db *sql.DB, class string) (float64, float64, float64, float
 	return t1, t2, t3, fee, nil
 }
 func Addstudent(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// session, _ := store.Get(r, "store")
-	// if session.Values["sturecmsaid"] == nil {
-	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
-	// 	return
-	// }
+	cookie, err := r.Cookie("auth_token")
+	if err != nil {
+		// If the cookie is not found, redirect to login
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Validate JWT token from the cookie
+	claims, err := ValidateJWT(cookie.Value)
+	if err != nil {
+		// If the token is invalid or expired, redirect to login
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if claims.Role != "admin" {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	// Log authenticated user info for debugging
+	log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
 
 	tmpl, err := template.ParseFiles(
 		"templates/addstudent.html",
@@ -165,7 +180,8 @@ func Addstudent(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 			http.Error(w, "Error inserting student: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-
+		message := "Hi parent, " + student.FirstName + " has been registered in " + student.Class + " with admission number " + student.AdmissionNumber + ". You will use the username '" + student.UserName + "' and password '" + student.Password + "' to log in to the student portal to access fee statements: https://schools.infinitytechafrica.com/login"
+		SendSms(student.ContactNumber, message)
 		log.Printf("Student %s successfully added to the database", student.FirstName)
 		http.Redirect(w, r, "/addstudent", http.StatusSeeOther)
 		return

@@ -25,19 +25,26 @@ type TemplateData struct {
 
 // FormHandler handles form submission and database operations
 func FormHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	cookie, err := r.Cookie("auth_token")
+	if err != nil {
+		// If the cookie is not found, redirect to login
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
 
-	// session, err := store.Get(r, "store")
-	// if err != nil {
-	// 	log.Printf("Failed to retrieve session: %v", err)
-	// 	http.Error(w, "Internal server error.", http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// // Check if user is logged in
-	// if session.Values["sturecmsaid"] == nil {
-	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
-	// 	return
-	// }
+	// Validate JWT token from the cookie
+	claims, err := ValidateJWT(cookie.Value)
+	if err != nil {
+		// If the token is invalid or expired, redirect to login
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if claims.Role != "admin" {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	// Log authenticated user info for debugging
+	log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
 
 	if r.Method == http.MethodPost {
 		// Retrieve form values

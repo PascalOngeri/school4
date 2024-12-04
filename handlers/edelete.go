@@ -6,34 +6,45 @@ import (
 	"net/http"
 )
 
-// edelete renders the delete page without session management
 func edelete(w http.ResponseWriter, r *http.Request) {
-	// Log the incoming request to render the delete page
-	log.Println("Received request to render delete student page")
+	cookie, err := r.Cookie("auth_token")
+	if err != nil {
+		// If the cookie is not found, redirect to login
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Validate JWT token from the cookie
+	claims, err := ValidateJWT(cookie.Value)
+	if err != nil {
+		// If the token is invalid or expired, redirect to login
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if claims.Role != "admin" {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	// Log authenticated user info for debugging
+	log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
 
 	// Parse the template files
 	tmpl, err := template.ParseFiles("templates/edelete.html", "includes/footer.html", "includes/header.html", "includes/sidebar.html")
 	if err != nil {
-		// Log the error and return an internal server error response
-		log.Printf("Error parsing templates: %v", err)
-		http.Error(w, "Error parsing templates", http.StatusInternalServerError)
+		// Handle the error properly, e.g., by returning a 500 status
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Data to pass to the template
 	data := map[string]interface{}{
-		"Title": "Delete Student", // Dynamic data for the title
+		"Title": "Manage Class", // Example dynamic data
 	}
 
 	// Execute the template and write to the response
 	err = tmpl.Execute(w, data)
 	if err != nil {
-		// Log the error and return an internal server error response
-		log.Printf("Error executing template: %v", err)
-		http.Error(w, "Error rendering page", http.StatusInternalServerError)
-		return
+		// Handle the error properly
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-
-	// Log successful rendering of the page
-	log.Println("Successfully rendered delete student page")
 }

@@ -12,20 +12,27 @@ import (
 
 // PayFeeHandler handles fee payment logic
 func PayFeeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// // Retrieve session
+	// Retrieve session
+	cookie, err := r.Cookie("auth_token")
+	if err != nil {
+		// If the cookie is not found, redirect to login
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
 
-	// session, err := store.Get(r, "store")
-	// if err != nil {
-	// 	log.Printf("Failed to retrieve session: %v", err)
-	// 	http.Error(w, "Internal server error.", http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// // Check user authentication
-	// if session.Values["sturecmsaid"] == nil {
-	// 	http.Redirect(w, r, "/login", http.StatusSeeOther)
-	// 	return
-	// }
+	// Validate JWT token from the cookie
+	claims, err := ValidateJWT(cookie.Value)
+	if err != nil {
+		// If the token is invalid or expired, redirect to login
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if claims.Role != "admin" {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	// Log authenticated user info for debugging
+	log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
 
 	if r.Method == http.MethodPost {
 		adm := r.FormValue("adm")

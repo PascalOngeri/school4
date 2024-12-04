@@ -7,98 +7,108 @@ import (
 	"net/http"
 )
 
-// EditCompulsoryPaymentHandler handles the update of compulsory payments without session handling
+// EditCompulsoryPaymentHandler handles the update of compulsory payments
 func EditCompulsoryPaymentHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Log the incoming request
-		log.Println("Received request to edit compulsory payment")
+		cookie, err := r.Cookie("auth_token")
+		if err != nil {
+			// If the cookie is not found, redirect to login
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+
+		// Validate JWT token from the cookie
+		claims, err := ValidateJWT(cookie.Value)
+		if err != nil {
+			// If the token is invalid or expired, redirect to login
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		if claims.Role != "admin" {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		// Log authenticated user info for debugging
+		log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
 
 		// Fetch the ID of the compulsory payment to be edited from the URL
+
 		var id string
 		if r.Method == "POST" {
-			id = r.FormValue("id") // Fetch ID from the form for POST requests
+			id = r.FormValue("id") // Fetch ID from the form
 		} else {
 			id = r.URL.Query().Get("id") // Fetch ID from URL query for GET requests
 		}
 
 		// If it's a POST request, update the payment details in the database
 		if r.Method == "POST" {
-			// Get form values for updating payment details
+
+			id := r.FormValue("id")
 			paymentName := r.FormValue("fname")
 			className := r.FormValue("mname")
 			term1 := r.FormValue("lname")
 			term2 := r.FormValue("stuemail")
 			term3 := r.FormValue("dob")
 
-			// Combine term values to calculate the total amount (assuming terms are integers)
+			// Convert term1, term2, and term3 to integers
 			amount := term1 + term2 + term3
 
-			// Get the current payment details to be updated
+			// Get the current payment details
 			var currentAmount, currentTerm1, currentTerm2, currentTerm3 int
 			var currentClassName string
 			query := `SELECT amount, term1, term2, term3, form FROM feepay WHERE id = ?`
 			err := db.QueryRow(query, id).Scan(&currentAmount, &currentTerm1, &currentTerm2, &currentTerm3, &currentClassName)
 			if err != nil {
-				log.Printf("Error fetching current payment details: %v", err)
 				http.Error(w, "Error fetching payment details", http.StatusInternalServerError)
+				log.Printf("Error fetching payment details: %v", err)
 				return
 			}
 
-			// Subtract old payment data from the classes table
-			log.Printf("Updating classes table by subtracting old payment details for class: %s", currentClassName)
+			// First, subtract the old payment data from the classes table
 			_, err = db.Exec(`
 				UPDATE classes 
 				SET fee = fee - ?, t1 = t1 - ?, t2 = t2 - ?, t3 = t3 - ? 
 				WHERE class = ?`, currentAmount, currentTerm1, currentTerm2, currentTerm3, currentClassName)
 			if err != nil {
-				log.Printf("Error updating classes table with old data: %v", err)
 				http.Error(w, "Error updating classes table", http.StatusInternalServerError)
+				log.Printf("Error updating classes table: %v", err)
 				return
 			}
 
-			// Update the payment details in the feepay table
-			log.Printf("Updating payment details for payment ID: %s", id)
+			// Now, update the payment details in the feepay table
 			_, err = db.Exec(`
 				UPDATE feepay 
 				SET paymentname = ?, form = ?, term1 = ?, term2 = ?, term3 = ?, amount = ? 
 				WHERE id = ?`, paymentName, className, term1, term2, term3, amount, id)
 			if err != nil {
-				log.Printf("Error updating compulsory payment: %v", err)
 				http.Error(w, "Error updating compulsory payment", http.StatusInternalServerError)
+				log.Printf("Error updating compulsory payment: %v", err)
 				return
 			}
 
-			// Add the new payment data to the classes table
-			log.Printf("Adding new payment data to classes table for class: %s", className)
+			// Finally, add the new payment data to the classes table
 			_, err = db.Exec(`
 				UPDATE classes 
 				SET fee = fee + ?, t1 = t1 + ?, t2 = t2 + ?, t3 = t3 + ? 
 				WHERE class = ?`, amount, term1, term2, term3, className)
 			if err != nil {
+				http.Error(w, "Error updating classes table", http.StatusInternalServerError)
 				log.Printf("Error updating classes table with new data: %v", err)
-				http.Error(w, "Error updating classes table with new data", http.StatusInternalServerError)
 				return
 			}
 
-			// Redirect to the update payment page after successful update
-			log.Println("Payment successfully updated, redirecting to /updatepayment")
+			// Redirect to a success page or another handler
 			http.Redirect(w, r, "/updatepayment", http.StatusSeeOther)
 			return
 		}
 
-		// If it's a GET request, fetch the payment details to display for editing
-		log.Printf("Fetching payment details for editing, payment ID: %s", id)
+		// If it's a GET request, fetch the payment details to edit
 		var payment Payment
 		query := `SELECT id, paymentname, form, term1, term2, term3, amount FROM feepay WHERE id = ?`
-		err := db.QueryRow(query, id).Scan(&payment.ID, &payment.PaymentName, &payment.ClassName, &payment.Term1, &payment.Term2, &payment.Term3, &payment.Amount)
-		if err != nil {
-			log.Printf("Error fetching payment details from database: %v", err)
-			http.Error(w, "Error fetching payment details", http.StatusInternalServerError)
-			return
-		}
+		err = db.QueryRow(query, id).Scan(&payment.ID, &payment.PaymentName, &payment.ClassName, &payment.Term1, &payment.Term2, &payment.Term3, &payment.Amount)
 
 		// Parse and render the template with the payment details
-		log.Println("Rendering edit compulsory payment template")
+		// Parse template files
 		tmpl, err := template.ParseFiles(
 			"templates/editC.html",
 			"includes/header.html",
@@ -118,8 +128,5 @@ func EditCompulsoryPaymentHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Error rendering template", http.StatusInternalServerError)
 			return
 		}
-
-		// Log the successful rendering of the template
-		log.Println("Successfully rendered edit payment template")
 	}
 }

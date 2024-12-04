@@ -6,25 +6,39 @@ import (
 	"net/http"
 )
 
-// Function to delete a student
+// Function ya kufuta mwanafunzi
 func DeleteStudent(db *sql.DB) http.HandlerFunc {
+
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get the student ID from the URL query string
-		id := r.URL.Query().Get("id")
-		if id == "" {
-			http.Error(w, "Missing student ID", http.StatusBadRequest)
+
+		cookie, err := r.Cookie("auth_token")
+		if err != nil {
+			// If the cookie is not found, redirect to login
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 
-		// Execute the DELETE query
-		_, err := db.Exec("DELETE FROM registration WHERE id = ?", id)
+		// Validate JWT token from the cookie
+		claims, err := ValidateJWT(cookie.Value)
 		if err != nil {
-			log.Printf("Error deleting user: %v", err)
+			// If the token is invalid or expired, redirect to login
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		if claims.Role != "admin" {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		// Log authenticated user info for debugging
+		log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
+
+		id := r.URL.Query().Get("id")
+		_, err = db.Exec("DELETE FROM registration WHERE id = ?", id)
+
+		if err != nil {
 			http.Error(w, "Error deleting user", http.StatusInternalServerError)
 			return
 		}
-
-		// Redirect to the manage students page after successful deletion
 		http.Redirect(w, r, "/managestudent", http.StatusSeeOther)
 	}
 }
