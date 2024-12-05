@@ -368,11 +368,11 @@ func main() {
 	}
 
 	// Get database connection details from environment variables
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbName := os.Getenv("DB_NAME")
+	dbUser := os.Getenv("remote")
+	dbPassword := os.Getenv("Qwerty254!")
+	dbHost := os.Getenv("173.249.20.229")
+	dbPort := os.Getenv("3306")
+	dbName := os.Getenv("schoolsystem")
 
 	// Log the database connection details (be mindful of sensitive information)
 	log.Printf("Connecting to database %s at %s:%s...", dbName, dbHost, dbPort)
