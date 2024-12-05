@@ -123,14 +123,37 @@ type LoginData struct {
 var store = sessions.NewCookieStore([]byte("store"))
 
 // Initialize the database connection
+
+//var db *sql.DB
+
+// Initialize the database connection using environment variables
 func initDB() {
 	var err error
-	//db, err = sql.Open("mysql", "root:@mesopotamia123@tcp(localhost:3306)/eduauth")
-	db, err = sql.Open("mysql", "root:@tcp(localhost:3306)/eduauth")
+
+	// Fetch database credentials from environment variables
+	dbUser := os.Getenv("DB_USER")     // "remote"
+	dbPassword := os.Getenv("DB_PASSWORD") // "Qwerty254!"
+	dbHost := os.Getenv("B_HOST")      // "173.249.20.229"
+	dbPort := os.Getenv("DB_PORT")     // "3306"
+	dbName := os.Getenv("DB_NAME")     // "schoolsystem"
+
+	// Construct the database connection string (DSN)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
+
+	// Open a connection to the database
+	db, err = sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+
+	// Test the database connection
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Error pinging the database: %v", err)
+	}
+
+	log.Println("Successfully connected to the database.")
 }
+
 func getClasses() ([]Class, error) {
 	rows, err := db.Query("SELECT id, class FROM classes") // Replace "classes" with your table name
 	if err != nil {
@@ -368,12 +391,12 @@ func main() {
 	}
 
 	// Get database connection details from environment variables
-	dbUser := os.Getenv("remote")
-	dbPassword := os.Getenv("Qwerty254!")
-	dbHost := os.Getenv("173.249.20.229")
-	dbPort := os.Getenv("3306")
-	dbName := os.Getenv("schoolsystem")
-
+	// Get database connection details from environment variables
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
 	// Log the database connection details (be mindful of sensitive information)
 	log.Printf("Connecting to database %s at %s:%s...", dbName, dbHost, dbPort)
 
@@ -540,8 +563,8 @@ func main() {
 		handlers.Send(w, r, db)
 	}).Methods("GET", "POST")
 
-	log.Println("Server is running on :8080")
-	if err := http.ListenAndServe(":8080", router); err != nil {
+	log.Println("Server is running on :8050")
+	if err := http.ListenAndServe(":8050", router); err != nil {
 		log.Fatal("Error starting server: ", err)
 	}
 }
