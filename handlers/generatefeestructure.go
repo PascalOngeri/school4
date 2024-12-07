@@ -22,42 +22,25 @@ type PaymentRecord struct {
 
 // GenerateFeeHandler generates the fee statement for a given admission number
 func GenerateFeeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	// Check if request method is POST
 	if r.Method != http.MethodPost {
-		log.Println("Invalid request method")
+		log.Println("Invalid request method: ", r.Method)
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
+	// Retrieve admission number from form data
 	adm := r.FormValue("adm")
 	if adm == "" {
 		log.Println("Admission number is required")
 		http.Error(w, "Admission number is required", http.StatusBadRequest)
 		return
 	}
-	cookie, err := r.Cookie("auth_token")
-	if err != nil {
-		// If the cookie is not found, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
 
-	// Validate JWT token from the cookie
-	claims, err := ValidateJWT(cookie.Value)
-	if err != nil {
-		// If the token is invalid or expired, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	if claims.Role != "admin" {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	log.Printf("Generating fee statement for admission number: %s\n", adm)
-
-	// Query the database to get payment records
+	// Query the database to get payment records for the given admission number
 	rows, err := db.Query("SELECT id, date, amount, bal FROM payment WHERE adm = ? ORDER BY id ASC", adm)
 	if err != nil {
-		log.Printf("Database query error: %v\n", err)
+		log.Printf("Database query error for admission number %s: %v\n", adm, err)
 		http.Error(w, "Error fetching payment records", http.StatusInternalServerError)
 		return
 	}
@@ -70,15 +53,16 @@ func GenerateFeeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	for rows.Next() {
 		var payment PaymentRecord
 		if err := rows.Scan(&payment.ID, &payment.Date, &payment.Amount, &payment.Balance); err != nil {
-			log.Printf("Failed to scan row: %v\n", err)
-			continue
+			log.Printf("Failed to scan row for admission number %s: %v\n", adm, err)
+			http.Error(w, "Error processing payment records", http.StatusInternalServerError)
+			return
 		}
 		payments = append(payments, payment)
 	}
 
 	// Check for any row iteration errors
 	if rows.Err() != nil {
-		log.Printf("Rows iteration error: %v\n", rows.Err())
+		log.Printf("Error iterating over rows for admission number %s: %v\n", adm, rows.Err())
 		http.Error(w, "Error processing payment records", http.StatusInternalServerError)
 		return
 	}
@@ -89,12 +73,16 @@ func GenerateFeeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
 	// Set logo path and add the logo to the document
 	logoPath := filepath.Join("assets", "images", "logo.png")
+	if _, err := os.Stat(logoPath); os.IsNotExist(err) {
+		log.Printf("Logo file not found: %v\n", err)
+		http.Error(w, "Logo file not found", http.StatusInternalServerError)
+		return
+	}
 	pdf.ImageOptions(logoPath, 80, 10, 50, 0, false, gofpdf.ImageOptions{ImageType: "PNG"}, 0, "")
 
 	// Add school name below the logo
 	pdf.SetFont("Arial", "B", 16)
 	pdf.Ln(50) // Adjust the vertical space as needed
-
 	pdf.CellFormat(0, 10, "INFINITY SCHOOLS", "", 1, "C", false, 0, "")
 	pdf.Ln(10)
 
@@ -120,23 +108,23 @@ func GenerateFeeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		pdf.CellFormat(38, 10, status, "1", 1, "C", false, 0, "")
 	}
 
-	// Check for any PDF generation errors
-	if pdf.Err() {
-		log.Println("Error generating PDF")
-		http.Error(w, "Error generating PDF", http.StatusInternalServerError)
-		return
-	}
+	// // Check for any PDF generation errors
+	// if pdf.Err() != nil {
+	// 	log.Println("Error generating PDF: ", pdf.Err())
+	// 	http.Error(w, "Error generating PDF", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	// Create output directory
 	outputDir := "generated_pdfs"
 	err = os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
-		log.Printf("Error creating directory: %v", err)
+		log.Printf("Error creating directory %s: %v", outputDir, err)
 		http.Error(w, "Error creating directory", http.StatusInternalServerError)
 		return
 	}
 
-	// Generate unique file name
+	// Generate unique file name for the PDF
 	timestamp := time.Now().Format("20060102150405")
 	fileName := fmt.Sprintf("fee_statement_%s_%s.pdf", adm, timestamp)
 	filePath := filepath.Join(outputDir, fileName)
@@ -144,11 +132,14 @@ func GenerateFeeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Save the PDF to the file
 	err = pdf.OutputFileAndClose(filePath)
 	if err != nil {
-		log.Printf("Error saving PDF: %v", err)
+		log.Printf("Error saving PDF file %s: %v", filePath, err)
 		http.Error(w, "Error saving PDF", http.StatusInternalServerError)
 		return
 	}
 
-	// Redirect to the parent page
+	// Log the success of the PDF generation
+	log.Printf("Fee statement generated successfully for admission number %s. Saved to %s\n", adm, filePath)
+
+	// Redirect to the parent page (or wherever you want)
 	http.Redirect(w, r, "/parent", http.StatusSeeOther)
 }

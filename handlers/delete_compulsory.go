@@ -8,65 +8,51 @@ import (
 
 // DeleteCompulsoryHandler handles the deletion of a record from the "feepay" table
 func DeleteCompulsoryHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// Get the payment name from the query parameters
-	cookie, err := r.Cookie("auth_token")
-	if err != nil {
-		// If the cookie is not found, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// Log the incoming request
+	log.Printf("[INFO] Received request to delete a payment record: %s %s", r.Method, r.URL.Path)
+
+	// Get the payment ID from query parameters
+	paymentID := r.URL.Query().Get("delid")
+	if paymentID == "" {
+		http.Error(w, "Missing payment ID", http.StatusBadRequest)
+		log.Println("[ERROR] Missing 'delid' parameter in request")
 		return
 	}
 
-	// Validate JWT token from the cookie
-	claims, err := ValidateJWT(cookie.Value)
-	if err != nil {
-		// If the token is invalid or expired, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	if claims.Role != "admin" {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	// Log authenticated user info for debugging
-	log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
-
-	paymentName := r.URL.Query().Get("delid")
-	if paymentName == "" {
-		http.Error(w, "Missing PaymentName", http.StatusBadRequest)
-		return
-	}
-
-	// Prepare the delete statement
+	// Prepare the DELETE SQL query
 	query := "DELETE FROM feepay WHERE id = ?"
 	stmt, err := db.Prepare(query)
 	if err != nil {
-		log.Println("Error preparing query:", err)
+		log.Printf("[ERROR] Failed to prepare DELETE query: %v", err)
 		http.Error(w, "Failed to prepare delete statement", http.StatusInternalServerError)
 		return
 	}
 	defer stmt.Close()
 
-	// Execute the delete statement
-	result, err := stmt.Exec(paymentName)
+	// Execute the query
+	result, err := stmt.Exec(paymentID)
 	if err != nil {
-		log.Println("Error executing delete:", err)
+		log.Printf("[ERROR] Error executing DELETE query for payment ID '%s': %v", paymentID, err)
 		http.Error(w, "Failed to delete record", http.StatusInternalServerError)
 		return
 	}
 
-	// Check how many rows were affected
+	// Check the number of rows affected
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Println("Error getting rows affected:", err)
+		log.Printf("[ERROR] Failed to retrieve rows affected for payment ID '%s': %v", paymentID, err)
 		http.Error(w, "Failed to retrieve delete status", http.StatusInternalServerError)
 		return
 	}
 
-	// Respond to the client
+	// Handle cases where no rows were affected
 	if rowsAffected == 0 {
+		log.Printf("[INFO] No record found to delete for payment ID '%s'", paymentID)
 		http.Error(w, "No record found to delete", http.StatusNotFound)
 		return
 	}
 
+	// Log success and redirect the user
+	log.Printf("[INFO] Successfully deleted payment record with ID '%s'", paymentID)
 	http.Redirect(w, r, "/updatepayment", http.StatusSeeOther)
 }

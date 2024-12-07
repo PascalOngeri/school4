@@ -6,39 +6,35 @@ import (
 	"net/http"
 )
 
-// Function ya kufuta mwanafunzi
+// DeleteStudent deletes a student from the "registration" table by ID
 func DeleteStudent(db *sql.DB) http.HandlerFunc {
-
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Log the incoming request
+		log.Printf("[INFO] Received request to delete student: %s %s", r.Method, r.URL.Path)
 
-		cookie, err := r.Cookie("auth_token")
-		if err != nil {
-			// If the cookie is not found, redirect to login
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		// Validate JWT token from the cookie
-		claims, err := ValidateJWT(cookie.Value)
-		if err != nil {
-			// If the token is invalid or expired, redirect to login
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		if claims.Role != "admin" {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		// Log authenticated user info for debugging
-		log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
-
+		// Retrieve the student ID from the query parameter
 		id := r.URL.Query().Get("id")
-		_, err = db.Exec("DELETE FROM registration WHERE id = ?", id)
-
-		if err != nil {
-			http.Error(w, "Error deleting user", http.StatusInternalServerError)
+		if id == "" {
+			log.Println("[ERROR] Missing 'id' query parameter")
+			http.Error(w, "Missing student ID", http.StatusBadRequest)
 			return
 		}
+
+		// Log the student ID to be deleted
+		log.Printf("[INFO] Attempting to delete student with ID: %s", id)
+
+		// Prepare the DELETE statement
+		_, err := db.Exec("DELETE FROM registration WHERE id = ?", id)
+		if err != nil {
+			log.Printf("[ERROR] Failed to delete student with ID %s: %v", id, err)
+			http.Error(w, "Error deleting student", http.StatusInternalServerError)
+			return
+		}
+
+		// Log successful deletion
+		log.Printf("[INFO] Successfully deleted student with ID: %s", id)
+
+		// Redirect to the manage student page after successful deletion
 		http.Redirect(w, r, "/managestudent", http.StatusSeeOther)
 	}
 }

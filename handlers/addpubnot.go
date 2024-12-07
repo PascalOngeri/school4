@@ -7,33 +7,14 @@ import (
 	"net/http"
 )
 
+// AddPubNot handles adding a new public notice to the database
 func AddPubNot(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	cookie, err := r.Cookie("auth_token")
-	if err != nil {
-		// If the cookie is not found, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Validate JWT token from the cookie
-	claims, err := ValidateJWT(cookie.Value)
-	if err != nil {
-		// If the token is invalid or expired, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	if claims.Role != "admin" {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Log authenticated user info for debugging
-	log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
-
 	if r.Method == http.MethodPost {
 		// Parse the form data
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, "Unable to parse form: "+err.Error(), http.StatusBadRequest)
+		err := r.ParseForm()
+		if err != nil {
+			log.Printf("ERROR: Unable to parse form data: %v", err)
+			http.Error(w, "Bad Request: Unable to parse form data", http.StatusBadRequest)
 			return
 		}
 
@@ -41,31 +22,32 @@ func AddPubNot(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		nottitle := r.FormValue("nottitle")
 		notmsg := r.FormValue("notmsg")
 
-		// Log the received form data
-		log.Printf("Notice Title: %s, Notice Message: %s", nottitle, notmsg)
+		// Log the received form data for debugging
+		log.Printf("INFO: Received form data - Notice Title: %s, Notice Message: %s", nottitle, notmsg)
 
-		// Check if form data is valid
+		// Validate form data
 		if nottitle == "" || notmsg == "" {
+			log.Printf("ERROR: Missing required fields - Notice Title or Notice Message is empty")
 			http.Error(w, "Notice Title and Message are required fields.", http.StatusBadRequest)
 			return
 		}
 
 		// Insert data into the database
-		_, err := db.Exec("INSERT INTO tblpublicnotice (NoticeTitle, NoticeMessage) VALUES (?, ?)", nottitle, notmsg)
+		_, err = db.Exec("INSERT INTO tblpublicnotice (NoticeTitle, NoticeMessage) VALUES (?, ?)", nottitle, notmsg)
 		if err != nil {
-			log.Printf("Failed to insert notice: %v", err) // Log the error
-			http.Error(w, "Failed to insert notice: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("ERROR: Failed to insert notice into database: %v", err)
+			http.Error(w, "Internal Server Error: Failed to add notice", http.StatusInternalServerError)
 			return
 		}
 
-		log.Println("Notice successfully added")
+		log.Printf("INFO: Notice successfully added - Title: %s", nottitle)
 
-		// Redirect to the form page (or any other success page)
+		// Redirect to the form page (or a confirmation page)
 		http.Redirect(w, r, "/addpubnot", http.StatusSeeOther)
 		return
 	}
 
-	// Render the template for GET requests
+	// Render the form for GET requests
 	tmpl, err := template.ParseFiles(
 		"templates/addpubnotice.html",
 		"includes/header.html",
@@ -73,16 +55,18 @@ func AddPubNot(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		"includes/footer.html",
 	)
 	if err != nil {
-		http.Error(w, "Template parsing failed: "+err.Error(), http.StatusInternalServerError)
-		log.Printf("Error parsing template files: %v", err)
+		log.Printf("ERROR: Failed to parse template files for AddPubNot page: %v", err)
+		http.Error(w, "Internal Server Error: Unable to load page", http.StatusInternalServerError)
 		return
 	}
 
 	// Execute the template
 	err = tmpl.Execute(w, nil)
 	if err != nil {
-		http.Error(w, "Template execution failed: "+err.Error(), http.StatusInternalServerError)
-		log.Printf("Error executing template: %v", err)
+		log.Printf("ERROR: Failed to render AddPubNot page: %v", err)
+		http.Error(w, "Internal Server Error: Unable to render page", http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("INFO: Successfully rendered AddPubNot page")
 }

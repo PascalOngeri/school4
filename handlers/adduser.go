@@ -9,112 +9,96 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// GetClassDetails retrieves t1, t2, t3, and fee for a specific class from the classes table
-
 // ManageUser handles adding and deleting users
 func ManageUser(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		// Check if user is logged in
-		cookie, err := r.Cookie("auth_token")
-		if err != nil {
-			// If the cookie is not found, redirect to login
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		// Validate JWT token from the cookie
-		claims, err := ValidateJWT(cookie.Value)
-		if err != nil {
-			// If the token is invalid or expired, redirect to login
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		if claims.Role != "admin" {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		// Log authenticated user info for debugging
-		log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
+		// Log the HTTP method and request path
+		log.Printf("Handling request: %s %s", r.Method, r.URL.Path)
 
 		if r.Method == http.MethodPost {
-
+			// Parse form data
 			if err := r.ParseForm(); err != nil {
-				http.Error(w, "Unable to parse form: "+err.Error(), http.StatusBadRequest)
-				log.Printf("Form parsing error: %v", err)
+				http.Error(w, "Unable to parse form data.", http.StatusBadRequest)
+				log.Printf("[ERROR] Form parsing failed: %v", err)
 				return
 			}
 
-			action := r.FormValue("submit") // Capture which button was clicked
+			action := r.FormValue("submit") // Determine the action from the form
+
+			// Handle "Add" action
 			if action == "Add" {
-				// Add user logic
 				AName := r.FormValue("adminname")
 				mobno := r.FormValue("mobilenumber")
 				email := r.FormValue("email")
 				pass := r.FormValue("password")
 				username := r.FormValue("username")
 
-				// Validate input
+				// Validate input fields
 				if AName == "" || mobno == "" || email == "" || pass == "" || username == "" {
 					http.Error(w, "All fields are required.", http.StatusBadRequest)
-					log.Println("Validation error: missing required fields")
+					log.Println("[ERROR] Missing required fields for adding user")
 					return
 				}
 
 				// Hash the password
 				hashedPassword, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
 				if err != nil {
-					http.Error(w, "Failed to hash password.", http.StatusInternalServerError)
-					log.Printf("Password hashing error: %v", err)
+					http.Error(w, "Error while securing password.", http.StatusInternalServerError)
+					log.Printf("[ERROR] Password hashing failed: %v", err)
 					return
 				}
 
-				// Insert data into the database
+				// Insert the new user into the database
 				query := `INSERT INTO tblAdmin (AdminName, Email, UserName, Password, MobileNumber) VALUES (?, ?, ?, ?, ?)`
 				_, err = db.Exec(query, AName, email, username, hashedPassword, mobno)
 				if err != nil {
-					log.Printf("Database insertion error: %v", err)
-					http.Error(w, "Failed to add user: "+err.Error(), http.StatusInternalServerError)
+					http.Error(w, "Failed to add user to the database.", http.StatusInternalServerError)
+					log.Printf("[ERROR] Database insertion failed: %v", err)
 					return
 				}
 
-				log.Println("User successfully added")
+				log.Printf("[INFO] User '%s' successfully added", username)
 				http.Redirect(w, r, "/adduser", http.StatusSeeOther)
 				return
 			}
 
+			// Handle "Delete" action
 			if action == "Delete" {
-				// Delete user logic
 				username := r.FormValue("username")
 
 				if username == "" {
 					http.Error(w, "Username is required for deletion.", http.StatusBadRequest)
-					log.Println("Validation error: username is missing")
+					log.Println("[ERROR] Username is missing for deletion")
 					return
 				}
 
 				query := `DELETE FROM tblAdmin WHERE UserName = ?`
 				result, err := db.Exec(query, username)
 				if err != nil {
-					log.Printf("Database deletion error: %v", err)
-					http.Error(w, "Failed to delete user: "+err.Error(), http.StatusInternalServerError)
+					http.Error(w, "Failed to delete user from the database.", http.StatusInternalServerError)
+					log.Printf("[ERROR] Database deletion failed: %v", err)
 					return
 				}
 
 				rowsAffected, _ := result.RowsAffected()
 				if rowsAffected == 0 {
 					http.Error(w, "No user found with the provided username.", http.StatusNotFound)
-					log.Println("Deletion error: no matching user")
+					log.Printf("[WARNING] No user found with username '%s' for deletion", username)
 					return
 				}
 
-				log.Printf("User %s successfully deleted", username)
+				log.Printf("[INFO] User '%s' successfully deleted", username)
 				http.Redirect(w, r, "/adduser", http.StatusSeeOther)
 				return
 			}
+
+			// Log if the action is not recognized
+			log.Printf("[ERROR] Unknown action '%s' received", action)
+			http.Error(w, "Unknown action.", http.StatusBadRequest)
+			return
 		}
 
-		// Render the form template for GET requests
+		// Handle GET request to render the form
 		tmpl, err := template.ParseFiles(
 			"templates/adduser.html",
 			"includes/header.html",
@@ -122,15 +106,18 @@ func ManageUser(db *sql.DB) http.HandlerFunc {
 			"includes/footer.html",
 		)
 		if err != nil {
-			http.Error(w, "Failed to load templates: "+err.Error(), http.StatusInternalServerError)
-			log.Printf("Template parsing error: %v", err)
+			http.Error(w, "Failed to load the page.", http.StatusInternalServerError)
+			log.Printf("[ERROR] Template parsing failed: %v", err)
 			return
 		}
 
-		// Render the template
+		// Render the form
 		if err := tmpl.Execute(w, nil); err != nil {
 			http.Error(w, "Failed to render the page.", http.StatusInternalServerError)
-			log.Printf("Template execution error: %v", err)
+			log.Printf("[ERROR] Template execution failed: %v", err)
+			return
 		}
+
+		log.Println("[INFO] User management page rendered successfully")
 	}
 }

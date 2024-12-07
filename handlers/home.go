@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-
 	"html/template"
 	"log"
 	"net/http"
@@ -21,39 +20,18 @@ type HomePageData struct {
 
 // HomeHandler handles requests to the home page
 func HomeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	cookie, err := r.Cookie("auth_token")
-	if err != nil {
-		// If the cookie is not found, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// Retrieve the admission number from the form or URL parameters
+	adm := r.FormValue("adm")
+	if adm == "" {
+		log.Println("Admission number is required")
+		http.Error(w, "Admission number is required", http.StatusBadRequest)
 		return
 	}
-
-	// Validate JWT token from the cookie
-	claims, err := ValidateJWT(cookie.Value)
-	if err != nil {
-		// If the token is invalid or expired, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	if claims.Role != "user" {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	// Log authenticated user info for debugging
-	log.Printf("Authenticated user: %s, Role: %s, Admission Number: %s, Password: %s, Phone: %s",
-		claims.Username, claims.Role, claims.Adm, claims.password, claims.Phone)
-
-	adm := claims.Adm
-	username := claims.Username
-	phone := claims.Phone
-	password := claims.password
-
-	// Retrieve values from session
 
 	// Fetch payment history
 	paymentRows, err := db.Query("SELECT id, adm, date, amount, bal FROM payment WHERE adm = ? ORDER BY id DESC", adm)
 	if err != nil {
-		log.Printf("Failed to fetch payments: %v", err)
+		log.Printf("Failed to fetch payments for admission number %s: %v", adm, err)
 		http.Error(w, "Internal server error.", http.StatusInternalServerError)
 		return
 	}
@@ -64,14 +42,14 @@ func HomeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		var p Payment
 		err := paymentRows.Scan(&p.SNo, &p.RegNo, &p.Date, &p.Amount, &p.Balance)
 		if err != nil {
-			log.Printf("Failed to scan payment: %v", err)
+			log.Printf("Failed to scan payment for admission number %s: %v", adm, err)
 			continue
 		}
 		payments = append(payments, p)
 	}
 
 	// Fetch notices
-	noticeRows, err := db.Query("SELECT NoticeTitle, NoticeMessage,CreationDate FROM tblpublicnotice")
+	noticeRows, err := db.Query("SELECT NoticeTitle, NoticeMessage, CreationDate FROM tblpublicnotice")
 	if err != nil {
 		log.Printf("Failed to fetch notices: %v", err)
 		http.Error(w, "Internal server error.", http.StatusInternalServerError)
@@ -90,13 +68,16 @@ func HomeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		notices = append(notices, n)
 	}
 
+	// Log the fetched data for debugging
+	log.Printf("Fetched payments: %d, Fetched notices: %d for admission number %s", len(payments), len(notices), adm)
+
 	// Prepare data for the template
 	data := HomePageData{
 		Title:           "Infinityschools Analytics",
-		Username:        username,
+		Username:        "User", // Set username here if applicable
 		AdmissionNumber: adm,
-		Password:        password,
-		Phone:           phone,
+		Password:        "", // Assuming password is not passed directly, can be retrieved if necessary
+		Phone:           "", // Set phone if applicable
 		Payments:        payments,
 		Notices:         notices,
 	}
@@ -111,5 +92,9 @@ func HomeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	if err := tmpl.Execute(w, data); err != nil {
 		log.Printf("Error executing template: %v", err)
 		http.Error(w, "Error rendering page", http.StatusInternalServerError)
+		return
 	}
+
+	// Log successful rendering
+	log.Printf("Successfully rendered home page for admission number %s", adm)
 }

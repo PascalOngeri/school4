@@ -11,27 +11,8 @@ import (
 // EditOtherPaymentHandler handles updating "Other" payment details
 func EditOtherPaymentHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		cookie, err := r.Cookie("auth_token")
-		if err != nil {
-			// If the cookie is not found, redirect to login
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		// Validate JWT token from the cookie
-		claims, err := ValidateJWT(cookie.Value)
-		if err != nil {
-			// If the token is invalid or expired, redirect to login
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		if claims.Role != "admin" {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		// Log authenticated user info for debugging
-		log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
+		// Log the incoming request
+		log.Printf("[INFO] Received request to edit 'Other' payment details: %s %s", r.Method, r.URL.Path)
 
 		// Retrieve the ID based on the request method
 		var id string
@@ -42,9 +23,15 @@ func EditOtherPaymentHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Validate the ID
+		if id == "" {
+			log.Println("[ERROR] Missing payment ID")
+			http.Error(w, "Missing payment ID", http.StatusBadRequest)
+			return
+		}
 
+		// Handle POST request to update payment details
 		if r.Method == "POST" {
-			// Handle form submission
+			// Retrieve form values
 			paymentType := r.FormValue("fname")
 			term1 := r.FormValue("lname")
 			term2 := r.FormValue("stuemail")
@@ -53,16 +40,19 @@ func EditOtherPaymentHandler(db *sql.DB) http.HandlerFunc {
 			// Convert terms to integers
 			term1Int, err := strconv.Atoi(term1)
 			if err != nil {
+				log.Printf("[ERROR] Invalid value for Term 1: %v", err)
 				http.Error(w, "Invalid value for Term 1", http.StatusBadRequest)
 				return
 			}
 			term2Int, err := strconv.Atoi(term2)
 			if err != nil {
+				log.Printf("[ERROR] Invalid value for Term 2: %v", err)
 				http.Error(w, "Invalid value for Term 2", http.StatusBadRequest)
 				return
 			}
 			term3Int, err := strconv.Atoi(term3)
 			if err != nil {
+				log.Printf("[ERROR] Invalid value for Term 3: %v", err)
 				http.Error(w, "Invalid value for Term 3", http.StatusBadRequest)
 				return
 			}
@@ -74,12 +64,12 @@ func EditOtherPaymentHandler(db *sql.DB) http.HandlerFunc {
 				WHERE id = ?`
 			_, err = db.Exec(query, paymentType, term1Int, term2Int, term3Int, id)
 			if err != nil {
+				log.Printf("[ERROR] Error updating payment details: %v", err)
 				http.Error(w, "Error updating payment details", http.StatusInternalServerError)
-				log.Printf("Error updating payment: %v", err)
 				return
 			}
 
-			// Redirect to a success page or list of payments
+			// Redirect to the success page or list of payments
 			http.Redirect(w, r, "/updatepayment", http.StatusSeeOther)
 			return
 		}
@@ -92,7 +82,12 @@ func EditOtherPaymentHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		query := `SELECT id, type, t1, t2, t3 FROM other WHERE id = ?`
-		err = db.QueryRow(query, id).Scan(&payment.ID, &payment.Type, &payment.Term1, &payment.Term2, &payment.Term3)
+		err := db.QueryRow(query, id).Scan(&payment.ID, &payment.Type, &payment.Term1, &payment.Term2, &payment.Term3)
+		if err != nil {
+			log.Printf("[ERROR] Failed to fetch payment details for ID %s: %v", id, err)
+			http.Error(w, "Failed to fetch payment details", http.StatusInternalServerError)
+			return
+		}
 
 		// Parse the HTML template
 		tmpl, err := template.ParseFiles(
@@ -102,7 +97,7 @@ func EditOtherPaymentHandler(db *sql.DB) http.HandlerFunc {
 			"includes/footer.html",
 		)
 		if err != nil {
-			log.Printf("Error loading template: %v", err)
+			log.Printf("[ERROR] Error loading template: %v", err)
 			http.Error(w, "Error loading template", http.StatusInternalServerError)
 			return
 		}
@@ -110,9 +105,12 @@ func EditOtherPaymentHandler(db *sql.DB) http.HandlerFunc {
 		// Render the template with payment data
 		err = tmpl.Execute(w, payment)
 		if err != nil {
-			log.Printf("Error rendering template: %v", err)
+			log.Printf("[ERROR] Error rendering template: %v", err)
 			http.Error(w, "Error rendering template", http.StatusInternalServerError)
 			return
 		}
+
+		// Log successful page load
+		log.Printf("[INFO] Successfully loaded 'Other' payment edit page for ID %s", id)
 	}
 }

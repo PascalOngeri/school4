@@ -7,63 +7,58 @@ import (
 	"net/http"
 )
 
-// Class structure
-
 // EditClass handler for editing class details
 func EditClass(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("auth_token")
-		if err != nil {
-			// If the cookie is not found, redirect to login
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
+		// Log the incoming request
+		log.Printf("[INFO] Received request to edit class details: %s %s", r.Method, r.URL.Path)
 
-		// Validate JWT token from the cookie
-		claims, err := ValidateJWT(cookie.Value)
-		if err != nil {
-			// If the token is invalid or expired, redirect to login
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		if claims.Role != "admin" {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		// Log authenticated user info for debugging
-		log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
-
+		// Fetch the edit ID from the URL query
 		editID := r.URL.Query().Get("editid")
-		var class Class
+		if editID == "" {
+			log.Println("[ERROR] Missing class ID (editid)")
+			http.Error(w, "Missing class ID", http.StatusBadRequest)
+			return
+		}
 
 		// Fetch class details from the database
-		err = db.QueryRow("SELECT id, class, t1, t2, t3, fee FROM classes WHERE id = ?", editID).
+		var class Class
+		err := db.QueryRow("SELECT id, class, t1, t2, t3, fee FROM classes WHERE id = ?", editID).
 			Scan(&class.ID, &class.Class, &class.T1, &class.T2, &class.T3, &class.Fee)
-
 		if err != nil {
-			log.Printf("Failed to fetch class: %v", err)
-			http.Error(w, "Failed to fetch class details.", http.StatusInternalServerError)
+			log.Printf("[ERROR] Failed to fetch class details for ID %s: %v", editID, err)
+			http.Error(w, "Failed to fetch class details", http.StatusInternalServerError)
 			return
 		}
 
-		// Parse the template
-		tmpl, err := template.ParseFiles("templates/edit-class.html", "includes/header.html", "includes/sidebar.html", "includes/footer.html")
+		// Parse the template files
+		tmpl, err := template.ParseFiles(
+			"templates/edit-class.html",
+			"includes/header.html",
+			"includes/sidebar.html",
+			"includes/footer.html",
+		)
 		if err != nil {
-			log.Printf("Template parsing failed: %v", err)
-			http.Error(w, "Failed to load page templates.", http.StatusInternalServerError)
+			log.Printf("[ERROR] Failed to parse template files: %v", err)
+			http.Error(w, "Failed to load page templates", http.StatusInternalServerError)
 			return
 		}
 
-		// Execute the template with class data
+		// Prepare data to pass to the template
 		data := map[string]interface{}{
 			"Title": "Edit Class",
 			"Class": class,
 		}
 
+		// Execute the template and send the response
 		err = tmpl.Execute(w, data)
 		if err != nil {
-			log.Printf("Template execution failed: %v", err)
-			http.Error(w, "Failed to render the page.", http.StatusInternalServerError)
+			log.Printf("[ERROR] Failed to execute template: %v", err)
+			http.Error(w, "Failed to render the page", http.StatusInternalServerError)
+			return
 		}
+
+		// Log successful page load
+		log.Printf("[INFO] Successfully loaded class edit page for ID %s", editID)
 	}
 }

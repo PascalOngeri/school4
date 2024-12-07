@@ -50,26 +50,6 @@ func getUserByEmail(db *sql.DB, id string) (User, error) {
 // Handler to update user details
 func UpdateUserFormHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Handle GET request to display the form
-	cookie, err := r.Cookie("auth_token")
-	if err != nil {
-		// If the cookie is not found, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Validate JWT token from the cookie
-	claims, err := ValidateJWT(cookie.Value)
-	if err != nil {
-		// If the token is invalid or expired, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	if claims.Role != "admin" {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	// Log authenticated user info for debugging
-	log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
 
 	if r.Method == "GET" {
 		id := r.URL.Query().Get("id")

@@ -43,43 +43,23 @@ type Class struct {
 }
 
 func GetClassDetails(db *sql.DB, class string) (float64, float64, float64, float64, error) {
-	// Query to fetch details
 	query := `SELECT t1, t2, t3, fee FROM classes WHERE class = ?`
 	var t1, t2, t3, fee float64
-
-	// Execute the query
 	err := db.QueryRow(query, class).Scan(&t1, &t2, &t3, &fee)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return 0, 0, 0, 0, nil // No data found for the given class
+			log.Printf("[INFO] No class details found for class: %s", class)
+			return 0, 0, 0, 0, nil
 		}
-		return 0, 0, 0, 0, err // Handle other errors
+		log.Printf("[ERROR] Failed to fetch class details: %v", err)
+		return 0, 0, 0, 0, err
 	}
-
+	log.Printf("[DEBUG] Retrieved class details for %s: T1=%.2f, T2=%.2f, T3=%.2f, Fee=%.2f", class, t1, t2, t3, fee)
 	return t1, t2, t3, fee, nil
 }
+
 func Addstudent(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	cookie, err := r.Cookie("auth_token")
-	if err != nil {
-		// If the cookie is not found, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Validate JWT token from the cookie
-	claims, err := ValidateJWT(cookie.Value)
-	if err != nil {
-		// If the token is invalid or expired, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	if claims.Role != "admin" {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	// Log authenticated user info for debugging
-	log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
-
+	log.Printf("[INFO] Addstudent handler invoked")
 	tmpl, err := template.ParseFiles(
 		"templates/addstudent.html",
 		"includes/header.html",
@@ -87,15 +67,16 @@ func Addstudent(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		"includes/footer.html",
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("[ERROR] Failed to parse templates: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	// Fetch classes from the database
 	var classes []Class
 	rows, err := db.Query("SELECT id, class FROM classes")
 	if err != nil {
-		http.Error(w, "Database query failed: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("[ERROR] Database query failed: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -103,24 +84,26 @@ func Addstudent(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	for rows.Next() {
 		var class Class
 		if err := rows.Scan(&class.ID, &class.Name); err != nil {
-			http.Error(w, "Error scanning row: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[ERROR] Error scanning row: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		classes = append(classes, class)
 	}
-
 	if err := rows.Err(); err != nil {
-		http.Error(w, "Error iterating rows: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("[ERROR] Error iterating rows: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	if r.Method == http.MethodPost {
+		log.Printf("[INFO] Handling POST request to add student")
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			http.Error(w, "Unable to parse form", http.StatusBadRequest)
+			log.Printf("[ERROR] Failed to parse form: %v", err)
+			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
 
-		// Collect form data
 		student := Student{
 			FirstName:        r.FormValue("fname"),
 			MiddleName:       r.FormValue("mname"),
@@ -139,30 +122,33 @@ func Addstudent(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 			Password:         hashPassword(r.FormValue("password")),
 		}
 
-		// Handle file upload
 		file, handler, err := r.FormFile("image")
 		if err == nil {
 			defer file.Close()
 			uploadDir := "uploads/"
 			os.MkdirAll(uploadDir, os.ModePerm)
 
-			// Generate a random file name to avoid collisions
 			fileName := filepath.Join(uploadDir, randomFileName(handler.Filename))
 			destFile, err := os.Create(fileName)
 			if err == nil {
 				defer destFile.Close()
 				_, _ = destFile.ReadFrom(file)
 				student.Image = fileName
+				log.Printf("[DEBUG] Uploaded file saved as: %s", fileName)
+			} else {
+				log.Printf("[ERROR] Failed to save uploaded file: %v", err)
 			}
+		} else {
+			log.Printf("[INFO] No image uploaded for student")
 		}
+
 		t1, t2, t3, fee, err := GetClassDetails(db, student.Class)
 		if err != nil {
-			log.Printf("Database query error: %v", err)
-			http.Error(w, "Failed to fetch class details: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[ERROR] Failed to fetch class details: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		// Insert data into the database
 		query := `
 			INSERT INTO registration (
 				adm, fname, mname, lname, gender, faname, maname, class, phone, phone1,
@@ -177,33 +163,29 @@ func Addstudent(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 			student.UserName, student.Password,
 		)
 		if err != nil {
-			http.Error(w, "Error inserting student: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[ERROR] Failed to insert student into database: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		message := "Hi parent, " + student.FirstName + " has been registered in " + student.Class + " with admission number " + student.AdmissionNumber + ". You will use the username '" + student.UserName + "' and password '" + student.Password + "' to log in to the student portal to access fee statements: https://schools.infinitytechafrica.com/login"
-		SendSms(student.ContactNumber, message)
-		log.Printf("Student %s successfully added to the database", student.FirstName)
+		log.Printf("[INFO] Successfully added student: %s %s", student.FirstName, student.LastName)
 		http.Redirect(w, r, "/addstudent", http.StatusSeeOther)
 		return
 	}
 
-	// Render the form
 	data := map[string]interface{}{
 		"Title":   "Add Students",
 		"Classes": classes,
 	}
 	if err := tmpl.Execute(w, data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("[ERROR] Failed to render template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
 
-// Helper function to hash a password
 func hashPassword(password string) string {
-	// Add your hashing logic here (e.g., bcrypt)
-	return password // Replace with hashed password
+	return password
 }
 
-// Helper function to generate a random file name
 func randomFileName(original string) string {
 	buf := make([]byte, 8)
 	_, _ = rand.Read(buf)

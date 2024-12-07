@@ -8,48 +8,31 @@ import (
 
 // DeleteOtherHandler handles the deletion of a record from the "other" table
 func DeleteOtherHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// Get the payment name from the query parameters
+	// Log the incoming request
+	log.Printf("[INFO] Received request to delete 'other' record: %s %s", r.Method, r.URL.Path)
+
+	// Retrieve the `otherdel` query parameter
 	paymentName := r.URL.Query().Get("otherdel")
 	if paymentName == "" {
 		http.Error(w, "Missing payment name", http.StatusBadRequest)
+		log.Println("[ERROR] Missing 'otherdel' parameter in request")
 		return
 	}
 
-	cookie, err := r.Cookie("auth_token")
-	if err != nil {
-		// If the cookie is not found, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Validate JWT token from the cookie
-	claims, err := ValidateJWT(cookie.Value)
-	if err != nil {
-		// If the token is invalid or expired, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	if claims.Role != "admin" {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	// Log authenticated user info for debugging
-	log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
-
-	// Prepare the delete statement
+	// Prepare the DELETE statement to remove the record
 	query := "DELETE FROM other WHERE type = ?"
 	stmt, err := db.Prepare(query)
 	if err != nil {
-		log.Println("Error preparing query:", err)
+		log.Println("[ERROR] Error preparing DELETE query:", err)
 		http.Error(w, "Failed to prepare delete statement", http.StatusInternalServerError)
 		return
 	}
 	defer stmt.Close()
 
-	// Execute the delete statement
+	// Execute the DELETE statement
 	result, err := stmt.Exec(paymentName)
 	if err != nil {
-		log.Println("Error executing delete:", err)
+		log.Println("[ERROR] Error executing DELETE query:", err)
 		http.Error(w, "Failed to delete record", http.StatusInternalServerError)
 		return
 	}
@@ -57,7 +40,7 @@ func DeleteOtherHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Check how many rows were affected
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Println("Error getting rows affected:", err)
+		log.Println("[ERROR] Error getting rows affected:", err)
 		http.Error(w, "Failed to retrieve delete status", http.StatusInternalServerError)
 		return
 	}
@@ -65,8 +48,13 @@ func DeleteOtherHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Respond to the client
 	if rowsAffected == 0 {
 		http.Error(w, "No record found to delete", http.StatusNotFound)
+		log.Printf("[INFO] No record found for deletion with type '%s'", paymentName)
 		return
 	}
 
+	// Log successful deletion
+	log.Printf("[INFO] Successfully deleted record with type '%s'", paymentName)
+
+	// Redirect to the update payment page after successful deletion
 	http.Redirect(w, r, "/updatepayment", http.StatusSeeOther)
 }

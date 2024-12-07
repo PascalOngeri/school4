@@ -7,53 +7,48 @@ import (
 	"net/http"
 )
 
+// User represents a class record
+type Userr struct {
+	ID    int
+	Class string
+	T1    string
+	T2    string
+	T3    string
+	Fee   float64
+}
+
+// Manageclass handles the management of classes
 func Manageclass(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// Fetch data from the database
-	cookie, err := r.Cookie("auth_token")
-	if err != nil {
-		// If the cookie is not found, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Validate JWT token from the cookie
-	claims, err := ValidateJWT(cookie.Value)
-	if err != nil {
-		// If the token is invalid or expired, redirect to login
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	if claims.Role != "admin" {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	// Log authenticated user info for debugging
-	log.Printf("Authenticated user: %s, Role: %s", claims.Username, claims.Role)
-
-	users := []User{}
+	// Fetch class data from the database
 	rows, err := db.Query("SELECT id, class, t1, t2, t3, fee FROM classes")
 	if err != nil {
+		log.Printf("Error during db.Query: %v", err) // Debug log
 		http.Error(w, "Database query failed: "+err.Error(), http.StatusInternalServerError)
-		log.Printf("Error during db.Query: %v\n", err) // Debug log
 		return
 	}
 	defer rows.Close()
 
+	var users []User
 	// Process rows
 	for rows.Next() {
 		var user User
 		if err := rows.Scan(&user.ID, &user.Class, &user.T1, &user.T2, &user.T3, &user.Fee); err != nil {
+			log.Printf("Error during rows.Scan: %v", err) // Debug log
 			http.Error(w, "Error scanning row: "+err.Error(), http.StatusInternalServerError)
-			log.Printf("Error during rows.Scan: %v\n", err) // Debug log
 			return
 		}
 		users = append(users, user)
 	}
+
+	// Check if there was an error while iterating rows
 	if err := rows.Err(); err != nil {
+		log.Printf("Error during rows iteration: %v", err) // Debug log
 		http.Error(w, "Error iterating rows: "+err.Error(), http.StatusInternalServerError)
-		log.Printf("Error during rows iteration: %v\n", err) // Debug log
 		return
 	}
+
+	// Log the fetched data for debugging
+	log.Printf("Fetched %d class records from the database", len(users))
 
 	// Parse the template files
 	tmpl, err := template.ParseFiles(
@@ -63,16 +58,19 @@ func Manageclass(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		"includes/sidebar.html",
 	)
 	if err != nil {
+		log.Printf("Error parsing template files: %v", err) // Debug log
 		http.Error(w, "Template parsing failed: "+err.Error(), http.StatusInternalServerError)
-		log.Printf("Error parsing template files: %v\n", err) // Debug log
 		return
 	}
 
 	// Execute the template with the fetched data
 	err = tmpl.Execute(w, users)
 	if err != nil {
+		log.Printf("Error executing template: %v", err) // Debug log
 		http.Error(w, "Template execution failed: "+err.Error(), http.StatusInternalServerError)
-		log.Printf("Error executing template: %v\n", err) // Debug log
 		return
 	}
+
+	// Log successful execution
+	log.Printf("Successfully rendered manage class page with %d records", len(users))
 }

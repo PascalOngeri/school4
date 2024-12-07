@@ -6,12 +6,7 @@ import (
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/golang-jwt/jwt/v4"
 )
-
-// Secret key for signing JWT tokens
-var jwtSecretKey = []byte("your-secret-key")
 
 // API structure
 type API struct {
@@ -27,8 +22,6 @@ type LoginData struct {
 	Username string
 	Password string
 }
-
-// Claims struct for JWT claims
 
 // Get API details from the database
 func getAPIDetails(db *sql.DB) (API, error) {
@@ -61,6 +54,7 @@ func renderLoginPage(w http.ResponseWriter, api API, username string) {
 	tmpl.Execute(w, loginData)
 }
 
+// HandleLogin handles login requests
 func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	if r.Method == "POST" {
 		r.ParseForm()
@@ -69,7 +63,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
 		var userID int
 		var foundInAdmin bool
-		var adm, phone, role string // Define the fee variable
+		var adm, phone, role string
 
 		// Authenticate user in tbladmin
 		queryAdmin := "SELECT ID, UserName FROM tbladmin WHERE UserName = ? AND Password = ?"
@@ -80,43 +74,21 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		} else {
 			// Authenticate user in registration table
 			queryRegistration := "SELECT id, adm, username, phone, password FROM registration WHERE username = ? AND password = ?"
-			err = db.QueryRow(queryRegistration, username, password).Scan(&userID, &adm, &username, &phone, &password) // Pass address of fee
+			err = db.QueryRow(queryRegistration, username, password).Scan(&userID, &adm, &username, &phone, &password)
 			if err != nil {
-				http.Error(w, "Invalid login credentials", http.StatusUnauthorized)
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
 				return
 			}
 			role = "user"
 		}
 
-		// Create JWT token
-		expirationTime := time.Now().Add(8 * time.Hour) // 8 hours expiration
-
-		claims := &Claims{
-			UserID:   userID,
-			Username: username,
-			Adm:      adm,
-			Phone:    phone,
-			Role:     role,
-			password: password,
-			// Password included (consider security implications)
-			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(expirationTime),
-			},
-		}
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-		tokenString, err := token.SignedString(jwtSecretKey)
-		if err != nil {
-			http.Error(w, "Error creating JWT token", http.StatusInternalServerError)
-			return
-		}
-
-		// Set JWT in cookie
+		// Set the role in the cookie (without using JWT or sessions)
 		http.SetCookie(w, &http.Cookie{
-			Name:     "auth_token",
-			Value:    tokenString,
+			Name:     "user_role",
+			Value:    role,
 			Path:     "/",
-			Expires:  expirationTime,
 			HttpOnly: true,
+			Expires:  time.Now().Add(24 * time.Hour), // 1 day expiration
 		})
 
 		// Redirect based on role
@@ -135,89 +107,25 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	renderLoginPage(w, api, "")
 }
 
-// HandleLogin handles login requests
-// func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-// 	if r.Method == "POST" {
-// 		r.ParseForm()
-// 		username := r.FormValue("username")
-// 		password := r.FormValue("password")
-
-// 		var userID int
-// 		var foundInAdmin bool
-// 		var adm, phone, role string  // Define the fee variable
-
-// 		// Authenticate user in tbladmin
-// 		queryAdmin := "SELECT ID, UserName FROM tbladmin WHERE UserName = ? AND Password = ?"
-// 		err := db.QueryRow(queryAdmin, username, password).Scan(&userID, &username)
-// 		if err == nil {
-// 			foundInAdmin = true
-// 			role = "admin"
-// 		} else {
-// 			// Authenticate user in registration table
-// 			queryRegistration := "SELECT id, adm, username, phone, password FROM registration WHERE username = ? AND password = ?"
-// 			err = db.QueryRow(queryRegistration, username, password).Scan(&userID, &adm, &username, &phone, &password)  // Pass address of fee
-// 			if err != nil {
-// 				http.Error(w, "Invalid login credentials", http.StatusUnauthorized)
-// 				return
-// 			}
-// 			role = "user"
-// 		}
-
-// 		// Create JWT token
-// 		expirationTime := time.Now().Add(8 * time.Hour) // 8 hours expiration
-
-// 		claims := &Claims{
-// 			UserID:   userID,
-// 			Username: username,
-// 			Adm:      adm,
-// 			Phone:    phone,
-// 			Role:     role,
-// 			password: password,
-// 		 // Password included (consider security implications)
-// 			RegisteredClaims: jwt.RegisteredClaims{
-// 				ExpiresAt: jwt.NewNumericDate(expirationTime),
-// 			},
-// 		}
-// 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-// 		tokenString, err := token.SignedString(jwtSecretKey)
-// 		if err != nil {
-// 			http.Error(w, "Error creating JWT token", http.StatusInternalServerError)
-// 			return
-// 		}
-
-// 		// Set JWT in cookie
-// 		http.SetCookie(w, &http.Cookie{
-// 			Name:     "auth_token",
-// 			Value:    tokenString,
-// 			Path:     "/",
-// 			Expires:  expirationTime,
-// 			HttpOnly: true,
-// 		})
-
-// 		// Redirect based on role
-// 		if foundInAdmin {
-// 			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
-// 		} else {
-// 			http.Redirect(w, r, "/parent", http.StatusSeeOther)
-// 		}
-// 		return
-// 	}
-
-// 	// Render the login page for GET requests
-// 	api, _ := getAPIDetails(db)
-// 	renderLoginPage(w, api, "")
-// }
-
-// ValidateJWT function for validating the token
-func ValidateJWT(tokenString string) (*Claims, error) {
-	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecretKey, nil
-	})
-
-	if err != nil || !token.Valid {
-		return nil, err
+// DashboardHandler to handle the dashboard
+func DashboardHandler(w http.ResponseWriter, r *http.Request) {
+	// Read the role from the cookie
+	cookie, err := r.Cookie("user_role")
+	if err != nil {
+		// Handle error (e.g., user not logged in or cookie expired)
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
 	}
 
-	return claims, nil
+	// Use the cookie value (role)
+	role := cookie.Value
+	if role == "admin" {
+		// Render admin dashboard
+		// Add the logic for rendering the admin dashboard
+		http.ServeFile(w, r, "templates/admin_dashboard.html")
+	} else {
+		// Handle non-admin users (e.g., show a different dashboard)
+		// Add the logic for rendering the user dashboard
+		http.ServeFile(w, r, "templates/user_dashboard.html")
+	}
 }
