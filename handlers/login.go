@@ -3,9 +3,10 @@ package handlers
 import (
 	"database/sql"
 	"html/template"
-	"log"
 	"net/http"
-	"time"
+
+	"fmt"
+	"log"
 )
 
 // API structure
@@ -55,6 +56,7 @@ func renderLoginPage(w http.ResponseWriter, api API, username string) {
 }
 
 // HandleLogin handles login requests
+// HandleLogin handles login requests
 func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	if r.Method == "POST" {
 		r.ParseForm()
@@ -64,6 +66,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		var userID int
 		var foundInAdmin bool
 		var adm, phone, role string
+		var fee float64
 
 		// Authenticate user in tbladmin
 		queryAdmin := "SELECT ID, UserName FROM tbladmin WHERE UserName = ? AND Password = ?"
@@ -73,31 +76,27 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 			role = "admin"
 		} else {
 			// Authenticate user in registration table
-			queryRegistration := "SELECT id, adm, username, phone, password FROM registration WHERE username = ? AND password = ?"
-			err = db.QueryRow(queryRegistration, username, password).Scan(&userID, &adm, &username, &phone, &password)
+			queryRegistration := "SELECT id, adm, username, phone, password, fee FROM registration WHERE username = ? AND password = ?"
+			err = db.QueryRow(queryRegistration, username, password).Scan(&userID, &adm, &username, &phone, &password, &fee)
 			if err != nil {
 				http.Redirect(w, r, "/login", http.StatusSeeOther)
 				return
 			}
 			role = "user"
+			log.Printf("User ID: %d, Adm: %s, Username: %s, Phone: %s, Fee: %f", userID, adm, username, phone, fee)
 		}
-
-		// Set the role in the cookie (without using JWT or sessions)
-		http.SetCookie(w, &http.Cookie{
-			Name:     "user_role",
-			Value:    role,
-			Path:     "/",
-			HttpOnly: true,
-			Expires:  time.Now().Add(24 * time.Hour), // 1 day expiration
-		})
 
 		// Redirect based on role
 		if foundInAdmin {
-			// Admin should go to the dashboard
-			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+			redirectURL := "/dashboard?role=" + role + "&userID=" + fmt.Sprintf("%d", userID)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
 		} else if role == "user" {
 			// User (student) should go to the parent section
-			http.Redirect(w, r, "/parent", http.StatusSeeOther)
+			redirectURL := "/parent?role=" + role + "&userID=" + fmt.Sprintf("%d", userID) +
+				"&adm=" + adm + "&username=" + username + "&phone=" + phone + "&fee=" + fmt.Sprintf("%f", fee)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
 		}
 		return
 	}
@@ -105,27 +104,4 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Render the login page for GET requests
 	api, _ := getAPIDetails(db)
 	renderLoginPage(w, api, "")
-}
-
-// DashboardHandler to handle the dashboard
-func DashboardHandler(w http.ResponseWriter, r *http.Request) {
-	// Read the role from the cookie
-	cookie, err := r.Cookie("user_role")
-	if err != nil {
-		// Handle error (e.g., user not logged in or cookie expired)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Use the cookie value (role)
-	role := cookie.Value
-	if role == "admin" {
-		// Render admin dashboard
-		// Add the logic for rendering the admin dashboard
-		http.ServeFile(w, r, "templates/admin_dashboard.html")
-	} else {
-		// Handle non-admin users (e.g., show a different dashboard)
-		// Add the logic for rendering the user dashboard
-		http.ServeFile(w, r, "templates/user_dashboard.html")
-	}
 }

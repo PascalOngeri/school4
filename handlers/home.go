@@ -12,7 +12,6 @@ type HomePageData struct {
 	Title           string
 	Username        string
 	AdmissionNumber string
-	Password        string
 	Phone           string
 	Payments        []Payment
 	Notices         []Notice
@@ -20,81 +19,84 @@ type HomePageData struct {
 
 // HomeHandler handles requests to the home page
 func HomeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// Retrieve the admission number from the form or URL parameters
-	adm := r.FormValue("adm")
-	if adm == "" {
-		log.Println("Admission number is required")
-		http.Error(w, "Admission number is required", http.StatusBadRequest)
-		return
-	}
+	// Fetch user data from URL query parameters
+	role := r.URL.Query().Get("role")
+	userID := r.URL.Query().Get("userID")
+	adm := r.URL.Query().Get("adm")
+	username := r.URL.Query().Get("username")
+	phone := r.URL.Query().Get("phone")
+	fee := r.URL.Query().Get("fee")
 
-	// Fetch payment history
-	paymentRows, err := db.Query("SELECT id, adm, date, amount, bal FROM payment WHERE adm = ? ORDER BY id DESC", adm)
-	if err != nil {
-		log.Printf("Failed to fetch payments for admission number %s: %v", adm, err)
-		http.Error(w, "Internal server error.", http.StatusInternalServerError)
-		return
-	}
-	defer paymentRows.Close()
+	// Log or use the values for debugging
+	log.Printf("Role: %s, User ID: %s, Adm: %s, Username: %s, Phone: %s, Fee: %s", role, userID, adm, username, phone, fee)
 
-	var payments []Payment
-	for paymentRows.Next() {
-		var p Payment
-		err := paymentRows.Scan(&p.SNo, &p.RegNo, &p.Date, &p.Amount, &p.Balance)
+	// Handle the "user" role
+	if role == "user" {
+
+		// Fetch payment history from the database
+		paymentRows, err := db.Query("SELECT id, adm, date, amount, bal FROM payment WHERE adm = ? ORDER BY id DESC", adm)
 		if err != nil {
-			log.Printf("Failed to scan payment for admission number %s: %v", adm, err)
-			continue
+			log.Printf("Failed to fetch payments: %v", err)
+			http.Error(w, "Internal server error.", http.StatusInternalServerError)
+			return
 		}
-		payments = append(payments, p)
-	}
+		defer paymentRows.Close()
 
-	// Fetch notices
-	noticeRows, err := db.Query("SELECT NoticeTitle, NoticeMessage, CreationDate FROM tblpublicnotice")
-	if err != nil {
-		log.Printf("Failed to fetch notices: %v", err)
-		http.Error(w, "Internal server error.", http.StatusInternalServerError)
-		return
-	}
-	defer noticeRows.Close()
+		var payments []Payment
+		for paymentRows.Next() {
+			var p Payment
+			err := paymentRows.Scan(&p.SNo, &p.RegNo, &p.Date, &p.Amount, &p.Balance)
+			if err != nil {
+				log.Printf("Failed to scan payment: %v", err)
+				continue
+			}
+			payments = append(payments, p)
+		}
 
-	var notices []Notice
-	for noticeRows.Next() {
-		var n Notice
-		err := noticeRows.Scan(&n.Title, &n.Message, &n.Date)
+		// Fetch notices from the database
+		noticeRows, err := db.Query("SELECT NoticeTitle, NoticeMessage, CreationDate FROM tblpublicnotice")
 		if err != nil {
-			log.Printf("Failed to scan notice: %v", err)
-			continue
+			log.Printf("Failed to fetch notices: %v", err)
+			http.Error(w, "Internal server error.", http.StatusInternalServerError)
+			return
 		}
-		notices = append(notices, n)
-	}
+		defer noticeRows.Close()
 
-	// Log the fetched data for debugging
-	log.Printf("Fetched payments: %d, Fetched notices: %d for admission number %s", len(payments), len(notices), adm)
+		var notices []Notice
+		for noticeRows.Next() {
+			var n Notice
+			err := noticeRows.Scan(&n.Title, &n.Message, &n.Date)
+			if err != nil {
+				log.Printf("Failed to scan notice: %v", err)
+				continue
+			}
+			notices = append(notices, n)
+		}
 
-	// Prepare data for the template
-	data := HomePageData{
-		Title:           "Infinityschools Analytics",
-		Username:        "User", // Set username here if applicable
-		AdmissionNumber: adm,
-		Password:        "", // Assuming password is not passed directly, can be retrieved if necessary
-		Phone:           "", // Set phone if applicable
-		Payments:        payments,
-		Notices:         notices,
-	}
+		// Prepare data for the template
+		data := HomePageData{
+			Title:           "Infinityschools Analytics",
+			Username:        username,
+			AdmissionNumber: adm,
+			Phone:           phone,
+			Payments:        payments,
+			Notices:         notices,
+		}
 
-	// Render the template
-	tmpl, err := template.ParseFiles("templates/parent.html", "includes/footer.html")
-	if err != nil {
-		log.Printf("Error loading template: %v", err)
-		http.Error(w, "Error loading template", http.StatusInternalServerError)
-		return
-	}
-	if err := tmpl.Execute(w, data); err != nil {
-		log.Printf("Error executing template: %v", err)
-		http.Error(w, "Error rendering page", http.StatusInternalServerError)
-		return
-	}
+		// Render the template
+		tmpl, err := template.ParseFiles("templates/parent.html", "includes/footer.html")
+		if err != nil {
+			log.Printf("Error loading template: %v", err)
+			http.Error(w, "Error loading template", http.StatusInternalServerError)
+			return
+		}
+		if err := tmpl.Execute(w, data); err != nil {
+			log.Printf("Error executing template: %v", err)
+			http.Error(w, "Error rendering page", http.StatusInternalServerError)
+		}
 
-	// Log successful rendering
-	log.Printf("Successfully rendered home page for admission number %s", adm)
+	} else {
+		// If the role is not recognized, redirect to login
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	}
 }

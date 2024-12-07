@@ -8,16 +8,8 @@ import (
 // Dashboard handles the /dashboard route
 func Dashboard(w http.ResponseWriter, r *http.Request) {
 	// Read the role from the cookie
-	cookie, err := r.Cookie("user_role")
-	if err != nil {
-		// Handle error (e.g., user not logged in or cookie expired)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Use the cookie value (role)
-	role := cookie.Value
-
+	role := r.URL.Query().Get("role")
+	//userID := r.URL.Query().Get("userID")
 	// If role is "admin", show the dashboard
 	if role == "admin" {
 		// Parse templates
