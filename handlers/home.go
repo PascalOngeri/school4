@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+
 	"html/template"
 	"log"
 	"net/http"
@@ -12,14 +13,13 @@ type HomePageData struct {
 	Title           string
 	Username        string
 	AdmissionNumber string
+	Password        string
 	Phone           string
 	Payments        []Payment
 	Notices         []Notice
 }
 
-// HomeHandler handles requests to the home page
 func HomeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// Fetch user data from URL query parameters
 	role := r.URL.Query().Get("role")
 	userID := r.URL.Query().Get("userID")
 	adm := r.URL.Query().Get("adm")
@@ -27,13 +27,11 @@ func HomeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	phone := r.URL.Query().Get("phone")
 	fee := r.URL.Query().Get("fee")
 
-	// Log or use the values for debugging
+	// Log or use the values
 	log.Printf("Role: %s, User ID: %s, Adm: %s, Username: %s, Phone: %s, Fee: %s", role, userID, adm, username, phone, fee)
 
-	// Handle the "user" role
 	if role == "user" {
-
-		// Fetch payment history from the database
+		// Fetch payment history
 		paymentRows, err := db.Query("SELECT id, adm, date, amount, bal FROM payment WHERE adm = ? ORDER BY id DESC", adm)
 		if err != nil {
 			log.Printf("Failed to fetch payments: %v", err)
@@ -53,7 +51,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 			payments = append(payments, p)
 		}
 
-		// Fetch notices from the database
+		// Fetch notices
 		noticeRows, err := db.Query("SELECT NoticeTitle, NoticeMessage, CreationDate FROM tblpublicnotice")
 		if err != nil {
 			log.Printf("Failed to fetch notices: %v", err)
@@ -78,6 +76,7 @@ func HomeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 			Title:           "Infinityschools Analytics",
 			Username:        username,
 			AdmissionNumber: adm,
+			Password:        "",
 			Phone:           phone,
 			Payments:        payments,
 			Notices:         notices,
@@ -94,9 +93,8 @@ func HomeHandler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 			log.Printf("Error executing template: %v", err)
 			http.Error(w, "Error rendering page", http.StatusInternalServerError)
 		}
-
 	} else {
-		// If the role is not recognized, redirect to login
+		// Redirect to login if the role is not "user"
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	}
 }

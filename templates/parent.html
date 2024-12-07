@@ -124,7 +124,7 @@
                 </ul>
                 <ul class="nav navbar-nav navbar-right">
                     <li><a href="#" style="color: white" data-toggle="modal" data-target="#updateModal"  onclick="showLoader();" ><i class="fa fa-user"></i> Settings</a></li>
-                    <li><a href="logout.php" style="color: white"  onclick="showLoader();"><i class="fa fa-sign-out-alt" ></i> Log out</a></li>
+                    <li><a href="/logout" style="color: white"  onclick="showLoader();"><i class="fa fa-sign-out-alt" ></i> Log out</a></li>
                 </ul>
             </div>
         </div>
@@ -149,7 +149,7 @@
                         </div>
                         <div class="form-group">
                             <label for="password">Password:</label>
-                            <input type="text" class="form-control" id="password" name="password" value="{{.Password}}">
+                            <input type="text" class="form-control" id="password" name="password" value="">
                         </div>
                         <div class="form-group">
                             <label for="phone">Phone Number:</label>
@@ -166,7 +166,7 @@
         <center>
             <h3 class="text" style="text-align:center;">Welcome {{.Username}}</h3>
             <label>Student Admission number {{.AdmissionNumber}}</label>
-
+           
         </center>
         <br><br><hr><br>
         <div class="row">
@@ -175,15 +175,19 @@
                 <div class="content">
                      <center>
                         <h3>PAY FEE</h3>
-                        <form method="post" action="p.php">
+                        <form method="post" action="/ProcessPayment">
                             <div class="lbox1">    
                                 <input type="hidden" class="input3" name="adm" value="{{.AdmissionNumber}}"><br>
                             </div>
                            
-                          
+                            <div class="lbox1">    
+                                <input style="
+                                 border-radius: 20px;height:40px;"  class="input3" name="phone" placeholder="enter phone"><br>
+                            </div>
+                          <br>
                              <div class="lbox1">    
                                 <input style="
-                                 border-radius: 20px;height:40px;"  class="input3" name="ammount" placeholder="enter amount"><br>
+                                 border-radius: 20px;height:40px;" type="nu" class="input3" name="ammount" placeholder="enter amount"><br>
                             </div>
                            <br>
                              <button type="submit" class="btn" name="pay" style="background-color: green; color:white;border-radius: 20px;height:40px;" onclick="showLoader(); showMesage()">PAY</button>
@@ -192,12 +196,11 @@
                     </center><br>
                     <center>
                         <h3>Click to download</h3>
-                        <form method="post" action="/download">
+                        <form method="post" action="/generete">
                             <div class="lbox1">    
                                 <input type="hidden" class="input3" name="adm" value="{{.AdmissionNumber}}"><br>
                             </div>
                             <button type="submit" class="btn" name="action" value="generate" style="background-color: lightblue; border-radius: 20px;height:40px;" onclick="showLoader(); showMessage()">Download Fee Statement!!!!!</button>
-                             <button type="submit" class="btn" name="action" value="generetefee" style="background-color: lightblue; border-radius: 20px;height:40px;" onclick="showLoader(); showMessage()">My Fee Structure</button>
                             
                         </form>
                     </center>

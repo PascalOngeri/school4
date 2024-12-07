@@ -88,12 +88,13 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
 		// Redirect based on role
 		if foundInAdmin {
-			redirectURL := "/dashboard?role=" + role + "&userID=" + fmt.Sprintf("%d", userID)
+			redirectURL := "http://185.192.96.71:8060/dashboard?role=" + role + "&userID=" + fmt.Sprintf("%d", userID)
 			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 			return
 		} else if role == "user" {
+
 			// User (student) should go to the parent section
-			redirectURL := "/parent?role=" + role + "&userID=" + fmt.Sprintf("%d", userID) +
+			redirectURL := "http://185.192.96.71:8060/parent?role=" + role + "&userID=" + fmt.Sprintf("%d", userID) +
 				"&adm=" + adm + "&username=" + username + "&phone=" + phone + "&fee=" + fmt.Sprintf("%f", fee)
 			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 			return
