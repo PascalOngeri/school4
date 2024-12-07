@@ -131,11 +131,11 @@ func initDB() {
 	var err error
 
 	// Fetch database credentials from environment variables
-	dbUser := os.Getenv("DB_USER")     // "remote"
+	dbUser := os.Getenv("DB_USER")         // "remote"
 	dbPassword := os.Getenv("DB_PASSWORD") // "Qwerty254!"
-	dbHost := os.Getenv("B_HOST")      // "173.249.20.229"
-	dbPort := os.Getenv("DB_PORT")     // "3306"
-	dbName := os.Getenv("DB_NAME")     // "schoolsystem"
+	dbHost := os.Getenv("B_HOST")          // "173.249.20.229"
+	dbPort := os.Getenv("DB_PORT")         // "3306"
+	dbName := os.Getenv("DB_NAME")         // "schoolsystem"
 
 	// Construct the database connection string (DSN)
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
@@ -563,8 +563,8 @@ func main() {
 		handlers.Send(w, r, db)
 	}).Methods("GET", "POST")
 
-	log.Println("Server is running on :8050")
-	if err := http.ListenAndServe(":8050", router); err != nil {
+	log.Println("Server is running on :8060")
+	if err := http.ListenAndServe(":8060", router); err != nil {
 		log.Fatal("Error starting server: ", err)
 	}
 }
