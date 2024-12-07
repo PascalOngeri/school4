@@ -1,16 +1,21 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
 	"feego/handlers"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"github.com/joho/godotenv"
 )
 
 var db *sql.DB
@@ -118,13 +123,35 @@ type LoginData struct {
 var store = sessions.NewCookieStore([]byte("store"))
 
 // Initialize the database connection
+
+//var db *sql.DB
+
+// Initialize the database connection using environment variables
 func initDB() {
 	var err error
-	//db, err = sql.Open("mysql", "root:@mesopotamia123@tcp(localhost:3306)/eduauth")
-	db, err = sql.Open("mysql", "remote:Qwerty254!@tcp(173.249.20.229:3306)/schoolsystem")
+
+	// Fetch database credentials from environment variables
+	dbUser := os.Getenv("DB_USER")         // "remote"
+	dbPassword := os.Getenv("DB_PASSWORD") // "Qwerty254!"
+	dbHost := os.Getenv("B_HOST")          // "173.249.20.229"
+	dbPort := os.Getenv("DB_PORT")         // "3306"
+	dbName := os.Getenv("DB_NAME")         // "schoolsystem"
+
+	// Construct the database connection string (DSN)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
+
+	// Open a connection to the database
+	db, err = sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+
+	// Test the database connection
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Error pinging the database: %v", err)
+	}
+
+	log.Println("Successfully connected to the database.")
 }
 
 func getClasses() ([]Class, error) {
@@ -159,11 +186,236 @@ func getAPIDetails() (API, error) {
 	return api, nil
 }
 
-func main() {
-	// Example: Handling errors properly
+// Send SMS
+func sendSMS(phoneNumber, message string) error {
+	query := "SELECT apikey FROM api ORDER BY id DESC LIMIT 1"
+	var apiKey string
+	err := db.QueryRow(query).Scan(&apiKey)
+	if err != nil {
+		return fmt.Errorf("error fetching API key: %v", err)
+	}
 
-	initDB()
-	defer db.Close() // Ensure that db is closed when the app exits
+	postData := map[string]interface{}{
+		"message":      message,
+		"msisdn":       phoneNumber,
+		"callback_url": "https://callback.io/123/dlr",
+	}
+	jsonData, _ := json.Marshal(postData)
+
+	req, err := http.NewRequest("POST", "https://sms-service.smsafrica.tech/message/send/transactional", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("api-key", apiKey)
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 200 {
+		_, err := db.Exec("INSERT INTO logs(user, activities) VALUES('system', 'Sent Friday SMS to all users')")
+		return err
+	}
+	_, err = db.Exec("INSERT INTO logs(user, activities) VALUES('system', 'Failed to send Friday SMS to all users')")
+	return err
+}
+
+// // Check and send SMS if it's Friday
+// func checkAndSendFridaySMS() {
+// 	if time.Now().Weekday() == time.Friday {
+// 		today := time.Now().Format("2006-01-02")
+// 		query := "SELECT COUNT(*) FROM logs WHERE user='system' AND activities='Sent Friday SMS to all users' AND DATE(date) = ?"
+// 		var count int
+// 		err := db.QueryRow(query, today).Scan(&count)
+// 		if err != nil || count > 0 {
+// 			return
+// 		}
+
+// 		rows, err := db.Query("SELECT MobileNumber FROM tbladmin")
+// 		if err != nil {
+// 			log.Printf("Error retrieving phone numbers: %v", err)
+// 			return
+// 		}
+// 		defer rows.Close()
+
+// 		for rows.Next() {
+// 			var phoneNumber string
+// 			if err := rows.Scan(&phoneNumber); err == nil {
+// 				sendSMS(phoneNumber, "Happy Friday! From your system.")
+// 			}
+// 		}
+// 	}
+// }
+
+// Render login page
+func renderLoginPage(w http.ResponseWriter, api API) {
+	loginData := LoginData{
+		Name:     api.Name,
+		Icon:     api.Icon,
+		Username: "", // Populate if using cookies
+		Password: "", // Populate if using cookies
+		Remember: false,
+	}
+
+	log.Printf("Rendering login page with: %+v", loginData)
+
+	tmpl, err := template.ParseFiles("templates/index.html")
+	if err != nil {
+		log.Printf("Error loading template: %v", err)
+		http.Error(w, "Error loading template", http.StatusInternalServerError)
+		return
+	}
+	tmpl.Execute(w, loginData)
+}
+
+// Handle login
+func handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		// Parse the form data
+		r.ParseForm()
+		username := r.FormValue("username")
+		password := r.FormValue("password")
+		remember := r.FormValue("remember") == "on"
+
+		// Declare variables for user data
+		var userID int
+		var foundInAdmin bool
+		var adm, phone string
+
+		// Check in tbladmin
+		queryAdmin := "SELECT ID, UserName FROM tbladmin WHERE UserName = ? AND Password = ?"
+		err := db.QueryRow(queryAdmin, username, password).Scan(&userID, &username)
+		if err == nil {
+			// User found in tbladmin
+			foundInAdmin = true
+		} else {
+			// If not found in tbladmin, check tblregistration
+			queryRegistration := "SELECT id, adm, username, phone, password FROM registration WHERE username = ? AND password = ?"
+			err = db.QueryRow(queryRegistration, username, password).Scan(&userID, &adm, &username, &phone, &password)
+			if err != nil {
+				// User not found in either table
+				http.Error(w, "Invalid login credentials", http.StatusUnauthorized)
+				return
+			}
+		}
+
+		// Create session and set cookies
+		session, _ := store.Get(r, "id")
+
+		// Store values in session based on which table the user is found in
+		if foundInAdmin {
+			session.Values["sturecmsaid"] = userID
+			session.Values["username"] = username
+		} else {
+			session.Values["sturecmsaid"] = userID
+			session.Values["adm"] = adm
+			session.Values["username"] = username
+			session.Values["phone"] = phone
+			session.Values["password"] = password
+		}
+
+		// Save the session
+		//session.Save(r, w)
+		if err := session.Save(r, w); err != nil {
+			log.Printf("Error saving session: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		// Set cookies
+		// http.SetCookie(w, &http.Cookie{Name: "user_login", Value: username, Path: "/", MaxAge: 86400})
+		// if remember {
+		// 	http.SetCookie(w, &http.Cookie{Name: "userpassword", Value: password, Path: "/", MaxAge: 86400})
+		// }
+		http.SetCookie(w, &http.Cookie{
+			Name:     "user_login",
+			Value:    username,
+			Path:     "/",
+			Domain:   "schools.infinitytechafrica.com", // Replace with your actual domain
+			MaxAge:   86400,                            // 1 day
+			SameSite: http.SameSiteStrictMode,          // Choose StrictMode, LaxMode, or NoneMode as needed
+			Secure:   true,                             // Ensure cookies are sent only over HTTPS
+			HttpOnly: true,                             // Prevent JavaScript access to cookies
+		})
+
+		// If 'remember me' is checked, store the password as well
+		if remember {
+			cookiePassword := &http.Cookie{
+				Name:     "userpassword",
+				Value:    password,
+				Path:     "/",
+				Domain:   "schools.infinitytechafrica.com", // Replace with your actual domain
+				MaxAge:   86400,                            // 1 day
+				SameSite: http.SameSiteStrictMode,          // Enforce secure cookie handling
+				Secure:   true,                             // Ensure cookies are sent only over HTTPS
+				HttpOnly: true,                             // Prevent JavaScript access to cookies
+			}
+			http.SetCookie(w, cookiePassword)
+		}
+
+		// Redirect to the appropriate dashboard or parent page
+		if foundInAdmin {
+			http.Redirect(w, r, "/dashboard", http.StatusSeeOther) // Redirect to admin dashboard
+		} else {
+			http.Redirect(w, r, "/parent", http.StatusSeeOther) // Redirect to parent page
+		}
+		return
+	}
+
+	// Render login page if method is not POST
+	api, _ := getAPIDetails()
+	renderLoginPage(w, api)
+}
+
+func renderLoginPageWithError(w http.ResponseWriter, api API, errorMsg string) {
+	tmpl, _ := template.New("login").ParseFiles("templates/index.html")
+	data := struct {
+		API      API
+		ErrorMsg string
+	}{
+		API:      api,
+		ErrorMsg: errorMsg,
+	}
+	tmpl.Execute(w, data)
+}
+func main() {
+	// Load environment variables from .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+	// Get database connection details from environment variables
+	// Get database connection details from environment variables
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+	// Log the database connection details (be mindful of sensitive information)
+	log.Printf("Connecting to database %s at %s:%s...", dbName, dbHost, dbPort)
+
+	// Construct the connection string
+	connStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
+
+	// Open a connection to the database
+	db, err := sql.Open("mysql", connStr)
+	if err != nil {
+		log.Fatalf("Error connecting to database: %v", err)
+	}
+	defer func() {
+		log.Println("Closing database connection.")
+		db.Close()
+	}()
+
+	// Log successful database connection
+	log.Println("Successfully connected to the database.")
+
+	// Create a new router
 
 	router := mux.NewRouter()
 	router.HandleFunc("/api/select-phones", handlers.SelectPhonesHandler(db)).Methods("GET", "POST")
@@ -305,12 +557,181 @@ func main() {
 	router.HandleFunc("/deletecompulsory", func(w http.ResponseWriter, r *http.Request) {
 		handlers.DeleteCompulsoryHandler(w, r, db)
 	}).Methods("GET")
+
 	router.HandleFunc("/send", func(w http.ResponseWriter, r *http.Request) {
 		handlers.Send(w, r, db)
 	}).Methods("GET", "POST")
 
 	log.Println("Server is running on :8060")
-	if err := http.ListenAndServe("localhost:8060", router); err != nil {
+	if err := http.ListenAndServe(":8060", router); err != nil {
 		log.Fatal("Error starting server: ", err)
+	}
+}
+
+func add1(i int) int {
+	return i + 1
+}
+func searchStudentHandler(w http.ResponseWriter, r *http.Request) {
+	funcMap := template.FuncMap{
+		"add1": add1, // Register the add1 function
+	}
+	// Handle POST request (form submission)
+	if r.Method == http.MethodPost {
+		searchData := r.FormValue("searchdata")
+		if searchData == "" {
+			http.Error(w, "Please enter a search term", http.StatusBadRequest)
+			return
+		}
+
+		// Query the database to search for students by their admission number (Adm)
+		rows, err := db.Query("SELECT adm, fname, mname, lname, gender, faname, maname, class, phone, phone1, address, email, fee, t1, t2, t3, dob, image, username, password FROM registration WHERE adm LIKE ?", "%"+searchData+"%")
+		if err != nil {
+			http.Error(w, "Error querying database: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		// Create a slice to hold the students found
+		var students []STU
+		for rows.Next() {
+			var student STU
+			if err := rows.Scan(&student.Adm, &student.Fname, &student.Mname, &student.Lname, &student.Gender, &student.Faname, &student.Maname, &student.Class, &student.Phone, &student.Phone1, &student.Address, &student.Email, &student.Fee, &student.T1, &student.T2, &student.T3, &student.Dob, &student.Image, &student.Username, &student.Password); err != nil {
+				log.Println(err)
+				continue
+			}
+			students = append(students, student)
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, "Error reading from the database: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Register the custom template function
+
+		// Render the result template with the students data
+		tmpl, err := template.New("search").Funcs(funcMap).ParseFiles(
+			"templates/search.html", // Update this path as needed
+			"includes/header.html",
+			"includes/sidebar.html",
+			"includes/footer.html",
+		)
+		if err != nil {
+			http.Error(w, "Error parsing template: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("Error parsing template files: %v", err)
+			return
+		}
+
+		// Pass the students data to the template
+		// Pass the students data to the template
+		err = tmpl.Execute(w, students) // 'students' is the slice of STU passed as context
+		if err != nil {
+			http.Error(w, "Error executing template: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("Error executing template: %v", err)
+			return
+		}
+
+	} else {
+		// Handle GET request (render search form)
+		tmpl, err := template.ParseFiles(
+			"templates/search.html", // Update this path as needed
+			"includes/header.html",
+			"includes/sidebar.html",
+			"includes/footer.html",
+		)
+		if err != nil {
+			http.Error(w, "Error parsing template: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("Error parsing template files: %v", err)
+			return
+		}
+
+		// Execute the template (empty data for initial search page)
+		err = tmpl.Execute(w, nil)
+		if err != nil {
+			http.Error(w, "Error executing template: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("Error executing template: %v", err)
+			return
+		}
+	}
+}
+
+func send(w http.ResponseWriter, r *http.Request) {
+	// Parse the template files
+	tmpl, err := template.ParseFiles("templates/send.html", "includes/footer.html", "includes/header.html", "includes/sidebar.html")
+	if err != nil {
+		// Handle the error properly, e.g., by returning a 500 status
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Data to pass to the template
+	data := map[string]interface{}{
+		"Title": "Manage Class", // Example dynamic data
+	}
+
+	// Execute the template and write to the response
+	err = tmpl.Execute(w, data)
+	if err != nil {
+		// Handle the error properly
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func adduser(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		// Parse the form data
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Unable to parse form: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		AName := r.FormValue("adminname")
+		mobno := r.FormValue("mobilenumber")
+		email := r.FormValue("email")
+
+		pass := r.FormValue("password")
+		username := r.FormValue("username")
+		// Log the received form data
+		log.Printf("Notice Title: %s, Notice Message: %s", AName, mobno)
+
+		// Check if form data is valid
+		if mobno == "" || username == "" {
+			http.Error(w, "All fields are required fields.", http.StatusBadRequest)
+			return
+		}
+
+		// Insert data into the database
+		_, err := db.Exec("INSERT INTO tblAdmin (AdminName,Email,UserName,password,MobileNumber) VALUES (?, ?,?,?,?)", AName, email, username, pass, mobno)
+		if err != nil {
+			log.Printf("Failed to insert notice: %v", err) // Log the error
+			http.Error(w, "Failed to insert notice: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		log.Println("Notice successfully added")
+
+		// Redirect to the form page (or any other success page)
+		http.Redirect(w, r, "/adduser", http.StatusSeeOther)
+		return
+	}
+
+	// Render the template for GET requests
+	tmpl, err := template.ParseFiles(
+		"templates/adduser.html",
+		"includes/header.html",
+		"includes/sidebar.html",
+		"includes/footer.html",
+	)
+	if err != nil {
+		http.Error(w, "Template parsing failed: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("Error parsing template files: %v", err)
+		return
+	}
+
+	// Execute the template
+	err = tmpl.Execute(w, nil)
+	if err != nil {
+		http.Error(w, "Template execution failed: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("Error executing template: %v", err)
+		return
 	}
 }
